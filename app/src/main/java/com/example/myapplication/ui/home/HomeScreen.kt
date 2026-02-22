@@ -31,12 +31,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.R
+import com.example.myapplication.data.HomeItem
 
-data class HomeItem(
-    val id: Int,
-    val name: String,
-    val imageRes: Int
-)
 
 @Composable
 fun HomeScreen(modifier: Modifier = Modifier) {
