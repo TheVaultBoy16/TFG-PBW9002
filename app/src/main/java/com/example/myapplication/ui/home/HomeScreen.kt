@@ -65,6 +65,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
 
 @Composable
 fun HomeItemCard(item: HomeItem, modifier: Modifier = Modifier) {
+    // Variable que guarda el estado del botón
     var isRunning by remember { mutableStateOf(false) }
 
     Card(
