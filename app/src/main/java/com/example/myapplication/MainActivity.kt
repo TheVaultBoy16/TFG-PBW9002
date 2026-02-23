@@ -16,9 +16,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.myapplication.ui.home.HomeDefaultScreen
 import com.example.myapplication.ui.home.HomeScreen
 import com.example.myapplication.ui.theme.MyApplicationTheme
 
@@ -29,16 +34,27 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
+                // Estado para controlar qué pantalla se muestra
+                var showHomeScreen by remember { mutableStateOf(false) }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
                         MyTopAppBar(
                             title = stringResource(id = R.string.app_name),
-                            canNavigateBack = false
+                            canNavigateBack = showHomeScreen,
+                            navigateUp = { showHomeScreen = false } // Acción para volver atrás
                         )
                     }
                 ) { innerPadding ->
-                    HomeScreen(modifier = Modifier.padding(innerPadding))
+                    if (showHomeScreen) {
+                        HomeScreen(modifier = Modifier.padding(innerPadding))
+                    } else {
+                        HomeDefaultScreen(
+                            onConnectClick = { showHomeScreen = true }, // Cambia a la pantalla de la lista
+                            modifier = Modifier.padding(innerPadding).fillMaxSize()
+                        )
+                    }
                 }
             }
         }
@@ -73,8 +89,8 @@ fun MyTopAppBar(
 
 @Preview(showBackground = true)
 @Composable
-fun GreetingPreview() {
+fun AppPreview() {
     MyApplicationTheme {
-        HomeScreen()
+        HomeDefaultScreen(onConnectClick = {})
     }
 }
