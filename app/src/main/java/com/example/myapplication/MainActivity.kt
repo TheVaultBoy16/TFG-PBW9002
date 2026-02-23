@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
                         MyTopAppBar(
                             title = stringResource(id = R.string.app_name),
                             canNavigateBack = showHomeScreen,
-                            navigateUp = { showHomeScreen = false } // Acción para volver atrás
+                            navigateUp = { showHomeScreen = false }
                         )
                     }
                 ) { innerPadding ->
@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
                         HomeScreen(modifier = Modifier.padding(innerPadding))
                     } else {
                         HomeDefaultScreen(
-                            onConnectClick = { showHomeScreen = true }, // Cambia a la pantalla de la lista
+                            onConnectClick = { showHomeScreen = true },
                             modifier = Modifier.padding(innerPadding).fillMaxSize()
                         )
                     }
