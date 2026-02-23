@@ -1,6 +1,7 @@
 package com.example.myapplication.ui.home
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -33,9 +34,11 @@ import androidx.compose.ui.unit.dp
 import com.example.myapplication.R
 import com.example.myapplication.data.HomeItem
 
-
 @Composable
-fun HomeScreen(modifier: Modifier = Modifier) {
+fun HomeScreen(
+    onItemClick: (HomeItem) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val iconRes: Int = R.drawable.virtmanager_94317
     val items = listOf(
         HomeItem(1, "MV 1", iconRes),
@@ -54,14 +57,16 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(items) { item ->
-            HomeItemCard(item = item)
+            HomeItemCard(
+                item = item,
+                modifier = Modifier.clickable { onItemClick(item) }
+            )
         }
     }
 }
 
 @Composable
 fun HomeItemCard(item: HomeItem, modifier: Modifier = Modifier) {
-    // Variable que guarda el estado del botón
     var isRunning by remember { mutableStateOf(false) }
 
     Card(
@@ -103,5 +108,5 @@ fun HomeItemCard(item: HomeItem, modifier: Modifier = Modifier) {
 @Preview(showBackground = true)
 @Composable
 fun HomeScreenPreview() {
-    HomeScreen()
+    HomeScreen(onItemClick = {})
 }

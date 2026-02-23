@@ -23,9 +23,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.myapplication.data.HomeItem
 import com.example.myapplication.ui.home.HomeDefaultScreen
 import com.example.myapplication.ui.home.HomeScreen
 import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.example.myapplication.ui.vm.VmScreen
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -34,26 +36,49 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                // Estado para controlar qué pantalla se muestra
-                var showHomeScreen by remember { mutableStateOf(false) }
+                // Estados de navegación
+                var currentScreen by remember { mutableStateOf("default") }
+                var selectedItem by remember { mutableStateOf<HomeItem?>(null) }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
                         MyTopAppBar(
-                            title = stringResource(id = R.string.app_name),
-                            canNavigateBack = showHomeScreen,
-                            navigateUp = { showHomeScreen = false }
+                            title = when (currentScreen) {
+                                "vm_detail" -> selectedItem?.name ?: "Detalle"
+                                else -> stringResource(id = R.string.app_name)
+                            },
+                            canNavigateBack = currentScreen != "default",
+                            navigateUp = {
+                                if (currentScreen == "vm_detail") {
+                                    currentScreen = "home"
+                                } else {
+                                    currentScreen = "default"
+                                }
+                            }
                         )
                     }
                 ) { innerPadding ->
-                    if (showHomeScreen) {
-                        HomeScreen(modifier = Modifier.padding(innerPadding))
-                    } else {
-                        HomeDefaultScreen(
-                            onConnectClick = { showHomeScreen = true },
+                    when (currentScreen) {
+                        "default" -> HomeDefaultScreen(
+                            onConnectClick = { currentScreen = "home" },
                             modifier = Modifier.padding(innerPadding).fillMaxSize()
                         )
+                        "home" -> HomeScreen(
+                            onItemClick = { item ->
+                                selectedItem = item
+                                currentScreen = "vm_detail"
+                            },
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                        "vm_detail" -> selectedItem?.let { item ->
+                            VmScreen(
+                                item = item,
+                                onSave = { currentScreen = "home" },
+                                onRestore = { currentScreen = "home" },
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        }
                     }
                 }
             }
