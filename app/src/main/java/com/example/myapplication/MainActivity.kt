@@ -58,7 +58,7 @@ class MainActivity : ComponentActivity() {
                         MyTopAppBar(
                             title = when (currentScreen) {
                                 "vm_detail" -> selectedItem?.name ?: "Detalle"
-                                "login" -> "Login"
+                                "login" -> "Añadir conexión"
                                 else -> stringResource(id = R.string.app_name)
                             },
                             canNavigateBack = currentScreen != "default",
