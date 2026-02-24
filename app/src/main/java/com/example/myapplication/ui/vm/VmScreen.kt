@@ -32,6 +32,7 @@ fun VmScreen(
     item: HomeItem,
     onSave: () -> Unit,
     onRestore: () -> Unit,
+    onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Estados de la pantalla
@@ -102,6 +103,7 @@ fun VmScreenPreview() {
     VmScreen(
         item = HomeItem(1, "MV de Prueba", R.drawable.ic_launcher_foreground),
         onSave = {},
-        onRestore = {}
+        onRestore = {},
+        onCancel = {}
     )
 }

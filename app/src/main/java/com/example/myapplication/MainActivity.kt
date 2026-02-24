@@ -2,6 +2,7 @@ package com.example.myapplication
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +27,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.myapplication.data.HomeItem
 import com.example.myapplication.ui.home.HomeDefaultScreen
 import com.example.myapplication.ui.home.HomeScreen
+import com.example.myapplication.ui.login.LoginScreen
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.example.myapplication.ui.vm.VmScreen
 
@@ -40,20 +42,32 @@ class MainActivity : ComponentActivity() {
                 var currentScreen by remember { mutableStateOf("default") }
                 var selectedItem by remember { mutableStateOf<HomeItem?>(null) }
 
+                // Manejo del botón atrás del sistema
+                BackHandler(enabled = currentScreen != "default") {
+                    currentScreen = when (currentScreen) {
+                        "vm_detail" -> "home"
+                        "home" -> "login"
+                        "login" -> "default"
+                        else -> "default"
+                    }
+                }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
                         MyTopAppBar(
                             title = when (currentScreen) {
                                 "vm_detail" -> selectedItem?.name ?: "Detalle"
+                                "login" -> "Login"
                                 else -> stringResource(id = R.string.app_name)
                             },
                             canNavigateBack = currentScreen != "default",
                             navigateUp = {
-                                if (currentScreen == "vm_detail") {
-                                    currentScreen = "home"
-                                } else {
-                                    currentScreen = "default"
+                                currentScreen = when (currentScreen) {
+                                    "vm_detail" -> "home"
+                                    "home" -> "login"
+                                    "login" -> "default"
+                                    else -> "default"
                                 }
                             }
                         )
@@ -61,8 +75,12 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     when (currentScreen) {
                         "default" -> HomeDefaultScreen(
-                            onConnectClick = { currentScreen = "home" },
+                            onConnectClick = { currentScreen = "login" },
                             modifier = Modifier.padding(innerPadding).fillMaxSize()
+                        )
+                        "login" -> LoginScreen(
+                            onLoginClick = { _, _ -> currentScreen = "home" },
+                            modifier = Modifier.padding(innerPadding)
                         )
                         "home" -> HomeScreen(
                             onItemClick = { item ->
@@ -75,6 +93,7 @@ class MainActivity : ComponentActivity() {
                             VmScreen(
                                 item = item,
                                 onSave = { currentScreen = "home" },
+                                onCancel = { currentScreen = "home" },
                                 onRestore = { currentScreen = "home" },
                                 modifier = Modifier.padding(innerPadding)
                             )
