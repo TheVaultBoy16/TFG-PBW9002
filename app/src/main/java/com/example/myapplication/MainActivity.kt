@@ -2,7 +2,6 @@ package com.example.myapplication
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,12 +23,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.example.myapplication.data.HomeItem
 import com.example.myapplication.ui.home.HomeDefaultScreen
-import com.example.myapplication.ui.home.HomeScreen
-import com.example.myapplication.ui.login.LoginScreen
+import com.example.myapplication.ui.navigation.ApplicationNavGraph
+import com.example.myapplication.ui.navigation.Screen
 import com.example.myapplication.ui.theme.MyApplicationTheme
-import com.example.myapplication.ui.vm.VmScreen
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -38,67 +38,32 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                // Estados de navegación
-                var currentScreen by remember { mutableStateOf("default") }
-                var selectedItem by remember { mutableStateOf<HomeItem?>(null) }
+                val navController = rememberNavController()
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
 
-                // Manejo del botón atrás del sistema
-                BackHandler(enabled = currentScreen != "default") {
-                    currentScreen = when (currentScreen) {
-                        "vm_detail" -> "home"
-                        "home" -> "login"
-                        "login" -> "default"
-                        else -> "default"
-                    }
-                }
+                var selectedItem by remember { mutableStateOf<HomeItem?>(null) }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
                         MyTopAppBar(
-                            title = when (currentScreen) {
-                                "vm_detail" -> selectedItem?.name ?: "Detalle"
-                                "login" -> "Añadir conexión"
+                            title = when (currentRoute) {
+                                Screen.VmDetail.route -> selectedItem?.name ?: "Detalle"
+                                Screen.Login.route -> "Añadir conexión"
                                 else -> stringResource(id = R.string.app_name)
                             },
-                            canNavigateBack = currentScreen != "default",
-                            navigateUp = {
-                                currentScreen = when (currentScreen) {
-                                    "vm_detail" -> "home"
-                                    "home" -> "login"
-                                    "login" -> "default"
-                                    else -> "default"
-                                }
-                            }
+                            canNavigateBack = currentRoute != Screen.Default.route,
+                            navigateUp = { navController.popBackStack() }
                         )
                     }
                 ) { innerPadding ->
-                    when (currentScreen) {
-                        "default" -> HomeDefaultScreen(
-                            onConnectClick = { currentScreen = "login" },
-                            modifier = Modifier.padding(innerPadding).fillMaxSize()
-                        )
-                        "login" -> LoginScreen(
-                            onLoginClick = { _, _ -> currentScreen = "home" },
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                        "home" -> HomeScreen(
-                            onItemClick = { item ->
-                                selectedItem = item
-                                currentScreen = "vm_detail"
-                            },
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                        "vm_detail" -> selectedItem?.let { item ->
-                            VmScreen(
-                                item = item,
-                                onSave = { currentScreen = "home" },
-                                onCancel = { currentScreen = "home" },
-                                onRestore = { currentScreen = "home" },
-                                modifier = Modifier.padding(innerPadding)
-                            )
-                        }
-                    }
+                    ApplicationNavGraph(
+                        navController = navController,
+                        selectedItem = selectedItem,
+                        onSelectItem = { selectedItem = it },
+                        modifier = Modifier.padding(innerPadding)
+                    )
                 }
             }
         }
