@@ -24,7 +24,9 @@ fun ApplicationNavGraph(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     selectedItem: HomeItem?,
-    onSelectItem: (HomeItem) -> Unit
+    onSelectItem: (HomeItem) -> Unit,
+    onLogin: (String, String, String, Int) -> Unit,
+    vmList: List<HomeItem>
 ) {
     NavHost(
         navController = navController,
@@ -38,11 +40,14 @@ fun ApplicationNavGraph(
         }
         composable(route = Screen.Login.route) {
             LoginScreen(
-                onLoginClick = { _, _ -> navController.navigate(Screen.Home.route) }
+                onLoginClick = { username, hostname, password, port -> 
+                    onLogin(username, hostname, password, port)
+                }
             )
         }
         composable(route = Screen.Home.route) {
             HomeScreen(
+                vmList = vmList,
                 onItemClick = { item ->
                     onSelectItem(item)
                     navController.navigate(Screen.VmDetail.route)

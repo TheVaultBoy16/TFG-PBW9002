@@ -101,7 +101,7 @@ fun VmScreen(
 @Composable
 fun VmScreenPreview() {
     VmScreen(
-        item = HomeItem(1, "MV de Prueba", R.drawable.ic_launcher_foreground),
+        item = HomeItem("1", "MV de Prueba","running", R.drawable.ic_launcher_foreground),
         onSave = {},
         onRestore = {},
         onCancel = {}
