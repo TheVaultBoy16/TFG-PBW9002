@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -50,7 +51,6 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
 
                 var selectedItem by remember { mutableStateOf<HomeItem?>(null) }
-                // Lista dinámica de MVs
                 var vmList by remember { mutableStateOf<List<HomeItem>>(emptyList()) }
 
                 Scaffold(
@@ -74,13 +74,30 @@ class MainActivity : ComponentActivity() {
                         vmList = vmList,
                         onLogin = { username, hostname, password, port ->
                             scope.launch {
-                                val result = sshService.executeCommand(username, hostname, password, "virsh list --all", port)
+
+                                val command = "export PATH=\$PATH:/usr/bin:/usr/sbin:/usr/local/bin:/snap/bin; " +
+                                              "if command -v virsh >/dev/null 2>&1; then " +
+                                              "  virsh list --all; " +
+                                              "else " +
+                                              "  echo 'Error: virsh no encontrado. Rutas: '\$PATH; " +
+                                              "fi"
+                                
+                                val result = sshService.executeCommand(username, hostname, password, command, port)
+                                
                                 if (!result.startsWith("Error:")) {
-                                    Toast.makeText(this@MainActivity, "Conexión establecida", Toast.LENGTH_LONG).show()
-                                    vmList = parseVirshOutput(result)
-                                    navController.navigate(Screen.Home.route)
+                                    val parsedVms = parseVirshOutput(result)
+                                    if (parsedVms.isNotEmpty()) {
+                                        vmList = parsedVms
+                                        Toast.makeText(this@MainActivity, "Conectado: ${parsedVms.size} MVs", Toast.LENGTH_SHORT).show()
+                                        navController.navigate(Screen.Home.route)
+                                    } else {
+                                        Log.d("SSH_RESULT", result)
+                                        Toast.makeText(this@MainActivity, "Conectado, pero no se encontraron máquinas virtuales", Toast.LENGTH_LONG).show()
+                                        vmList = emptyList()
+                                        navController.navigate(Screen.Home.route)
+                                    }
                                 } else {
-                                    Toast.makeText(this@MainActivity, "Fallo de conexión: $result", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(this@MainActivity, "Fallo: $result", Toast.LENGTH_LONG).show()
                                 }
                             }
                         },
@@ -91,18 +108,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Función para parsear el texto de virsh en una lista de objetos HomeItem
     private fun parseVirshOutput(output: String): List<HomeItem> {
         val lines = output.lines()
         val vms = mutableListOf<HomeItem>()
         
-
-        for (i in 2 until lines.size) {
-            val line = lines[i].trim()
-            if (line.isEmpty()) continue
+        for (line in lines) {
+            val trimmedLine = line.trim()
+            if (trimmedLine.isEmpty() || 
+                trimmedLine.startsWith("Id") || 
+                trimmedLine.startsWith("---") ||
+                trimmedLine.contains("Nombre") ||
+                trimmedLine.contains("Estado")) continue
             
-            // Ejemplo de línea: "1    ubuntu20.04    running"
-            val parts = line.split(Regex("\\s+"))
+            val parts = trimmedLine.split(Regex("\\s+"))
+            
             if (parts.size >= 3) {
                 vms.add(
                     HomeItem(

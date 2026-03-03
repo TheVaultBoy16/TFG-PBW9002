@@ -17,7 +17,7 @@ class SshService {
         hostname: String, 
         password: String, 
         command: String,
-        port: Int = 22 // Valor por defecto del puerto
+        port: Int = 22
     ): String {
         return withContext(Dispatchers.IO) {
             var session: Session? = null
@@ -33,13 +33,27 @@ class SshService {
                 session.connect(5000)
 
                 channel = session.openChannel("exec") as ChannelExec
-                channel.setCommand(command)
+
+                channel.setCommand("export PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin; $command")
                 
                 val inputStream: InputStream = channel.inputStream
+                val errorStream: InputStream = channel.errStream
+                
                 channel.connect()
 
                 val result = inputStream.bufferedReader().use { it.readText() }
-                result
+                val errorResult = errorStream.bufferedReader().use { it.readText() }
+
+                // Esperamos a que el canal se cierre para obtener el estado de salida
+                while (!channel.isClosed) {
+                    Thread.sleep(100)
+                }
+
+                if (channel.exitStatus != 0 && result.isEmpty()) {
+                    "Error: ${errorResult.ifEmpty { "Código de salida ${channel.exitStatus}" }}"
+                } else {
+                    result
+                }
             } catch (e: Exception) {
                 "Error: ${e.message}"
             } finally {
