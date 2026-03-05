@@ -43,7 +43,7 @@ fun LoginScreen(
     var username by remember { mutableStateOf("") }
     var hostname by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var port by remember { mutableStateOf("2222") }
+    var port by remember { mutableStateOf("22") }
     var passwordVisible by remember { mutableStateOf(false) }
     
     var expanded by remember { mutableStateOf(false) }

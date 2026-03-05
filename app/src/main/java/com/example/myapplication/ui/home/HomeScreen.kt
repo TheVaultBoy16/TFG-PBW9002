@@ -33,6 +33,7 @@ import com.example.myapplication.data.HomeItem
 fun HomeScreen(
     vmList: List<HomeItem>,
     onItemClick: (HomeItem) -> Unit,
+    onToggleVm: (HomeItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -43,6 +44,7 @@ fun HomeScreen(
         items(vmList) { item ->
             HomeItemCard(
                 item = item,
+                onToggleClick = { onToggleVm(item) },
                 modifier = Modifier.clickable { onItemClick(item) }
             )
         }
@@ -50,8 +52,12 @@ fun HomeScreen(
 }
 
 @Composable
-fun HomeItemCard(item: HomeItem, modifier: Modifier = Modifier) {
-    // El icono de stop/play ahora depende del estado real de la VM
+fun HomeItemCard(
+    item: HomeItem,
+    onToggleClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+
     val isRunning = item.state.lowercase() == "running"
 
     Card(
@@ -80,7 +86,7 @@ fun HomeItemCard(item: HomeItem, modifier: Modifier = Modifier) {
                     .weight(1f)
             )
 
-            IconButton(onClick = { /* Aquí irá la acción de encender/apagar */ }) {
+            IconButton(onClick = onToggleClick) {
                 Icon(
                     imageVector = if (isRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
                     contentDescription = if (isRunning) "Detener" else "Arrancar"
@@ -93,5 +99,5 @@ fun HomeItemCard(item: HomeItem, modifier: Modifier = Modifier) {
 @Preview(showBackground = true)
 @Composable
 fun HomeScreenPreview() {
-    HomeScreen(vmList = emptyList(), onItemClick = {})
+    HomeScreen(vmList = emptyList(), onItemClick = {}, onToggleVm = {})
 }

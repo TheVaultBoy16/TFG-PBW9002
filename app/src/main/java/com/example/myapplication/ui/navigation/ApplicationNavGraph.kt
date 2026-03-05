@@ -26,6 +26,7 @@ fun ApplicationNavGraph(
     selectedItem: HomeItem?,
     onSelectItem: (HomeItem) -> Unit,
     onLogin: (String, String, String, Int) -> Unit,
+    onToggleVm: (HomeItem) -> Unit,
     vmList: List<HomeItem>
 ) {
     NavHost(
@@ -51,7 +52,8 @@ fun ApplicationNavGraph(
                 onItemClick = { item ->
                     onSelectItem(item)
                     navController.navigate(Screen.VmDetail.route)
-                }
+                },
+                onToggleVm = onToggleVm
             )
         }
         composable(route = Screen.VmDetail.route) {

@@ -1,7 +1,6 @@
 package com.example.myapplication
 
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -39,6 +38,12 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private val sshService = SshService()
 
+    // Se guardan las credenciales para poder ejecutar comandos después del login
+    private var currentHost = ""
+    private var currentUser = ""
+    private var currentPass = ""
+    private var currentPort = 2222
+
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,31 +78,33 @@ class MainActivity : ComponentActivity() {
                         onSelectItem = { selectedItem = it },
                         vmList = vmList,
                         onLogin = { username, hostname, password, port ->
+                            currentUser = username
+                            currentHost = hostname
+                            currentPass = password
+                            currentPort = port
+                            
                             scope.launch {
-
-                                val command = "export PATH=\$PATH:/usr/bin:/usr/sbin:/usr/local/bin:/snap/bin; " +
-                                              "if command -v virsh >/dev/null 2>&1; then " +
-                                              "  virsh list --all; " +
-                                              "else " +
-                                              "  echo 'Error: virsh no encontrado. Rutas: '\$PATH; " +
-                                              "fi"
-                                
-                                val result = sshService.executeCommand(username, hostname, password, command, port)
-                                
+                                val result = sshService.executeCommand(username, hostname, password, "virsh list --all", port)
                                 if (!result.startsWith("Error:")) {
-                                    val parsedVms = parseVirshOutput(result)
-                                    if (parsedVms.isNotEmpty()) {
-                                        vmList = parsedVms
-                                        Toast.makeText(this@MainActivity, "Conectado: ${parsedVms.size} MVs", Toast.LENGTH_SHORT).show()
-                                        navController.navigate(Screen.Home.route)
-                                    } else {
-                                        Log.d("SSH_RESULT", result)
-                                        Toast.makeText(this@MainActivity, "Conectado, pero no se encontraron máquinas virtuales", Toast.LENGTH_LONG).show()
-                                        vmList = emptyList()
-                                        navController.navigate(Screen.Home.route)
-                                    }
+                                    vmList = parseVirshOutput(result)
+                                    navController.navigate(Screen.Home.route)
                                 } else {
                                     Toast.makeText(this@MainActivity, "Fallo: $result", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        },
+                        onToggleVm = { item ->
+                            scope.launch {
+                                val action = if (item.state.lowercase() == "running") "shutdown" else "start"
+                                val command = "virsh $action ${item.name}"
+                                val result = sshService.executeCommand(currentUser, currentHost, currentPass, command, currentPort)
+                                
+                                if (!result.startsWith("Error:")) {
+                                    Toast.makeText(this@MainActivity, "Acción enviada: $action", Toast.LENGTH_SHORT).show()
+                                    val refreshResult = sshService.executeCommand(currentUser, currentHost, currentPass, "virsh list --all", currentPort)
+                                    vmList = parseVirshOutput(refreshResult)
+                                } else {
+                                    Toast.makeText(this@MainActivity, "Error al $action: $result", Toast.LENGTH_LONG).show()
                                 }
                             }
                         },
@@ -111,26 +118,13 @@ class MainActivity : ComponentActivity() {
     private fun parseVirshOutput(output: String): List<HomeItem> {
         val lines = output.lines()
         val vms = mutableListOf<HomeItem>()
-        
         for (line in lines) {
             val trimmedLine = line.trim()
-            if (trimmedLine.isEmpty() || 
-                trimmedLine.startsWith("Id") || 
-                trimmedLine.startsWith("---") ||
-                trimmedLine.contains("Nombre") ||
-                trimmedLine.contains("Estado")) continue
-            
+            if (trimmedLine.isEmpty() || trimmedLine.startsWith("Id") || trimmedLine.startsWith("---") ||
+                trimmedLine.contains("Nombre") || trimmedLine.contains("Estado")) continue
             val parts = trimmedLine.split(Regex("\\s+"))
-            
             if (parts.size >= 3) {
-                vms.add(
-                    HomeItem(
-                        id = parts[0],
-                        name = parts[1],
-                        state = parts[2],
-                        imageRes = R.drawable.virtmanager_94317
-                    )
-                )
+                vms.add(HomeItem(id = parts[0], name = parts[1], state = parts[2], imageRes = R.drawable.virtmanager_94317))
             }
         }
         return vms
@@ -153,10 +147,7 @@ fun MyTopAppBar(
         navigationIcon = {
             if (canNavigateBack) {
                 IconButton(onClick = navigateUp) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(id = R.string.back_button)
-                    )
+                    Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(id = R.string.back_button))
                 }
             }
         }
