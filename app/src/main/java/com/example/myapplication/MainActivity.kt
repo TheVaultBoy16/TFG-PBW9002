@@ -78,11 +78,7 @@ class MainActivity : ComponentActivity() {
                         onSelectItem = { selectedItem = it },
                         vmList = vmList,
                         onLogin = { username, hostname, password, port ->
-                            currentUser = username
-                            currentHost = hostname
-                            currentPass = password
-                            currentPort = port
-                            
+                            currentUser = username; currentHost = hostname; currentPass = password; currentPort = port
                             scope.launch {
                                 val result = sshService.executeCommand(username, hostname, password, "virsh list --all", port)
                                 if (!result.startsWith("Error:")) {
@@ -98,41 +94,31 @@ class MainActivity : ComponentActivity() {
                                 val isRunning = item.state.lowercase() == "running"
                                 val action = if (isRunning) "shutdown" else "start"
                                 val targetState = if (isRunning) "shut off" else "running"
-                                
-                                // 1. Actualización optimista inmediata
-                                vmList = vmList.map { 
-                                    if (it.name == item.name) {
-                                        it.copy(state = if (isRunning) "apagando..." else "iniciando...")
-                                    } else it 
-                                }
-
-                                val command = "virsh $action ${item.name}"
-                                val result = sshService.executeCommand(currentUser, currentHost, currentPass, command, currentPort)
-                                
-                                if (!result.startsWith("Error:")) {
-                                    Toast.makeText(this@MainActivity, "Señal enviada: $action", Toast.LENGTH_SHORT).show()
-                                    
-                                    // 2. Bucle de sondeo (polling): consultamos cada 5 seg durante máx 2 min
-                                    repeat(24) { 
-                                        delay(5000)
-                                        val refreshResult = sshService.executeCommand(currentUser, currentHost, currentPass, "virsh list --all", currentPort)
-                                        if (!refreshResult.startsWith("Error:")) {
-                                            val newList = parseVirshOutput(refreshResult)
-                                            vmList = newList
-                                            
-                                            // Comprobamos si la máquina ha llegado al estado deseado
-                                            val updatedItem = newList.find { it.name == item.name }
-                                            if (updatedItem?.state?.lowercase() == targetState) {
-                                                return@launch // Salimos del bucle
-                                            }
-                                        }
+                                vmList = vmList.map { if (it.name == item.name) it.copy(state = if (isRunning) "apagando..." else "iniciando...") else it }
+                                sshService.executeCommand(currentUser, currentHost, currentPass, "virsh $action ${item.name}", currentPort)
+                                repeat(24) { 
+                                    delay(5000)
+                                    val r = sshService.executeCommand(currentUser, currentHost, currentPass, "virsh list --all", currentPort)
+                                    if (!r.startsWith("Error:")) {
+                                        val newList = parseVirshOutput(r)
+                                        vmList = newList
+                                        if (newList.find { it.name == item.name }?.state?.lowercase() == targetState) return@launch
                                     }
-                                } else {
-                                    Toast.makeText(this@MainActivity, "Error: $result", Toast.LENGTH_LONG).show()
-                                    // Restauramos el estado real si falla el comando
-                                    val refreshResult = sshService.executeCommand(currentUser, currentHost, currentPass, "virsh list --all", currentPort)
-                                    vmList = parseVirshOutput(refreshResult)
                                 }
+                            }
+                        },
+                        onTakeSnapshot = { item, snapshotName ->
+                            scope.launch {
+                                val command = "virsh snapshot-create-as ${item.name} $snapshotName"
+                                val result = sshService.executeCommand(currentUser, currentHost, currentPass, command, currentPort)
+                                Toast.makeText(this@MainActivity, if (result.startsWith("Error:")) "Fallo: $result" else "Instantánea '$snapshotName' tomada", Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        onRestoreSnapshot = { item, snapshotName ->
+                            scope.launch {
+                                val command = "virsh snapshot-revert ${item.name} $snapshotName"
+                                val result = sshService.executeCommand(currentUser, currentHost, currentPass, command, currentPort)
+                                Toast.makeText(this@MainActivity, if (result.startsWith("Error:")) "Fallo: $result" else "Instantánea '$snapshotName' restaurada", Toast.LENGTH_LONG).show()
                             }
                         },
                         modifier = Modifier.padding(innerPadding)
@@ -151,7 +137,6 @@ class MainActivity : ComponentActivity() {
                 trimmedLine.contains("Nombre") || trimmedLine.contains("Estado")) continue
             val parts = trimmedLine.split(Regex("\\s+"))
             if (parts.size >= 3) {
-                // Concatenamos el resto de la línea para capturar estados como "shut off"
                 val state = parts.subList(2, parts.size).joinToString(" ")
                 vms.add(HomeItem(id = parts[0], name = parts[1], state = state, imageRes = R.drawable.virtmanager_94317))
             }

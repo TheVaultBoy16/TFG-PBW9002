@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,14 +31,11 @@ import com.example.myapplication.data.HomeItem
 @Composable
 fun VmScreen(
     item: HomeItem,
-    onSave: () -> Unit,
-    onRestore: () -> Unit,
-    onCancel: () -> Unit,
+    onTakeSnapshot: (String) -> Unit,
+    onRestoreSnapshot: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Estados de la pantalla
-    var name by remember { mutableStateOf(item.name) }
-    var description by remember { mutableStateOf("Descripción de la ${item.name}") }
+    var snapshotName by remember { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -52,8 +50,7 @@ fun VmScreen(
             Image(
                 painter = painterResource(id = item.imageRes),
                 contentDescription = "VM Image",
-                modifier = Modifier
-                    .size(100.dp)
+                modifier = Modifier.size(100.dp)
             )
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -62,36 +59,41 @@ fun VmScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.headlineSmall
-                )
-
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Text(text = item.name, style = MaterialTheme.typography.headlineSmall)
+                Text(text = item.state, style = MaterialTheme.typography.bodyMedium)
             }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
+
+        OutlinedTextField(
+            value = snapshotName,
+            onValueChange = { snapshotName = it },
+            label = { Text("Nombre de la instantánea") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Button(
-                onClick = onSave,
-                modifier = Modifier.weight(1f)
+                onClick = { if (snapshotName.isNotEmpty()) onTakeSnapshot(snapshotName) },
+                modifier = Modifier.weight(1f),
+                enabled = snapshotName.isNotEmpty()
             ) {
-                Text("Tomar instantánea")
+                Text("Tomar")
             }
 
             Button(
-                onClick = onRestore,
-                modifier = Modifier.weight(1f)
+                onClick = { if (snapshotName.isNotEmpty()) onRestoreSnapshot(snapshotName) },
+                modifier = Modifier.weight(1f),
+                enabled = snapshotName.isNotEmpty()
             ) {
-                Text("Restaurar instantánea")
+                Text("Restaurar")
             }
         }
     }
@@ -101,9 +103,8 @@ fun VmScreen(
 @Composable
 fun VmScreenPreview() {
     VmScreen(
-        item = HomeItem("1", "MV de Prueba","running", R.drawable.ic_launcher_foreground),
-        onSave = {},
-        onRestore = {},
-        onCancel = {}
+        item = HomeItem("1", "MV de Prueba", "running", R.drawable.ic_launcher_foreground),
+        onTakeSnapshot = {},
+        onRestoreSnapshot = {}
     )
 }
