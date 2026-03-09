@@ -81,8 +81,8 @@ fun HomeItemCard(
                 painter = painterResource(id = imageRes),
                 contentDescription = null,
                 modifier = Modifier
-                    .size(60.dp) // Tamaño cuadrado aumentado
-                    .clip(RoundedCornerShape(8.dp)), // Bordes suavizados para coincidir con la card
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(8.dp)),
                 contentScale = ContentScale.Crop
             )
 
