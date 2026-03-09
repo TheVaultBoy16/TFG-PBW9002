@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -80,10 +81,21 @@ class MainActivity : ComponentActivity() {
                         onLogin = { username, hostname, password, port ->
                             currentUser = username; currentHost = hostname; currentPass = password; currentPort = port
                             scope.launch {
-                                val result = sshService.executeCommand(username, hostname, password, "virsh list --all", port)
-                                if (!result.startsWith("Error:")) {
-                                    vmList = parseVirshOutput(result)
-                                    navController.navigate(Screen.Home.route)
+                                // Forzamos el idioma a inglés por el parser
+                                val command = "export LC_ALL=C; virsh list --all"
+                                val result = sshService.executeCommand(username, hostname, password, command, port)
+                                
+                                if (!result.startsWith("ERROR_SSH:")) {
+                                    val parsedVms = parseVirshOutput(result)
+                                    if (parsedVms.isNotEmpty()) {
+                                        vmList = parsedVms
+                                        navController.navigate(Screen.Home.route)
+                                    } else {
+                                        Log.d("VIRSH_DEBUG", "Salida: $result")
+                                        Toast.makeText(this@MainActivity, "No se encontraron MVs o formato desconocido", Toast.LENGTH_LONG).show()
+                                        vmList = emptyList()
+                                        navController.navigate(Screen.Home.route)
+                                    }
                                 } else {
                                     Toast.makeText(this@MainActivity, "Fallo: $result", Toast.LENGTH_LONG).show()
                                 }
@@ -91,34 +103,35 @@ class MainActivity : ComponentActivity() {
                         },
                         onToggleVm = { item ->
                             scope.launch {
-                                val isRunning = item.state.lowercase() == "running"
+                                val isRunning = item.state.lowercase().contains("running")
                                 val action = if (isRunning) "shutdown" else "start"
                                 val targetState = if (isRunning) "shut off" else "running"
-                                vmList = vmList.map { if (it.name == item.name) it.copy(state = if (isRunning) "apagando..." else "iniciando...") else it }
-                                sshService.executeCommand(currentUser, currentHost, currentPass, "virsh $action ${item.name}", currentPort)
-                                repeat(24) { 
-                                    delay(5000)
-                                    val r = sshService.executeCommand(currentUser, currentHost, currentPass, "virsh list --all", currentPort)
-                                    if (!r.startsWith("Error:")) {
+                                
+                                vmList = vmList.map { if (it.name == item.name) it.copy(state = "procesando...") else it }
+                                
+                                sshService.executeCommand(currentUser, currentHost, currentPass, "export LC_ALL=C; virsh $action ${item.name}", currentPort)
+                                
+                                repeat(10) { 
+                                    delay(4000)
+                                    val r = sshService.executeCommand(currentUser, currentHost, currentPass, "export LC_ALL=C; virsh list --all", currentPort)
+                                    if (!r.startsWith("ERROR_SSH:")) {
                                         val newList = parseVirshOutput(r)
                                         vmList = newList
-                                        if (newList.find { it.name == item.name }?.state?.lowercase() == targetState) return@launch
+                                        if (newList.find { it.name == item.name }?.state?.lowercase()?.contains(targetState) == true) return@launch
                                     }
                                 }
                             }
                         },
                         onTakeSnapshot = { item, snapshotName ->
                             scope.launch {
-                                val command = "virsh snapshot-create-as ${item.name} $snapshotName"
-                                val result = sshService.executeCommand(currentUser, currentHost, currentPass, command, currentPort)
-                                Toast.makeText(this@MainActivity, if (result.startsWith("Error:")) "Fallo: $result" else "Instantánea '$snapshotName' tomada", Toast.LENGTH_LONG).show()
+                                val result = sshService.executeCommand(currentUser, currentHost, currentPass, "virsh snapshot-create-as ${item.name} $snapshotName", currentPort)
+                                Toast.makeText(this@MainActivity, if (result.startsWith("ERROR_SSH:")) "Error al tomar snapshot" else "Snapshot OK", Toast.LENGTH_SHORT).show()
                             }
                         },
                         onRestoreSnapshot = { item, snapshotName ->
                             scope.launch {
-                                val command = "virsh snapshot-revert ${item.name} $snapshotName"
-                                val result = sshService.executeCommand(currentUser, currentHost, currentPass, command, currentPort)
-                                Toast.makeText(this@MainActivity, if (result.startsWith("Error:")) "Fallo: $result" else "Instantánea '$snapshotName' restaurada", Toast.LENGTH_LONG).show()
+                                val result = sshService.executeCommand(currentUser, currentHost, currentPass, "virsh snapshot-revert ${item.name} $snapshotName", currentPort)
+                                Toast.makeText(this@MainActivity, if (result.startsWith("ERROR_SSH:")) "Error al restaurar" else "Restaurado OK", Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.padding(innerPadding)
@@ -132,13 +145,18 @@ class MainActivity : ComponentActivity() {
         val lines = output.lines()
         val vms = mutableListOf<HomeItem>()
         for (line in lines) {
-            val trimmedLine = line.trim()
-            if (trimmedLine.isEmpty() || trimmedLine.startsWith("Id") || trimmedLine.startsWith("---") ||
-                trimmedLine.contains("Nombre") || trimmedLine.contains("Estado")) continue
-            val parts = trimmedLine.split(Regex("\\s+"))
+            val t = line.trim()
+            // Ignoramos cabeceras y líneas vacías
+            if (t.isEmpty() || t.startsWith("Id") || t.startsWith("---") || t.contains("Name") || t.contains("State")) continue
+            
+            // Separamos por espacios y filtramos elementos vacíos
+            val parts = t.split(Regex("\\s+")).filter { it.isNotBlank() }
+            
             if (parts.size >= 3) {
+                val name = parts[1]
+                // El estado puede tener varias palabras separadas
                 val state = parts.subList(2, parts.size).joinToString(" ")
-                vms.add(HomeItem(id = parts[0], name = parts[1], state = state, imageRes = R.drawable.virtmanager_94317))
+                vms.add(HomeItem(id = parts[0], name = name, state = state, imageRes = R.drawable.virtmanager_94317))
             }
         }
         return vms

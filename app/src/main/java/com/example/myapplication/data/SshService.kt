@@ -33,8 +33,11 @@ class SshService {
                 session.connect(5000)
 
                 channel = session.openChannel("exec") as ChannelExec
+                
+                // Forzamos el uso de un shell para asegurar que el PATH y el entorno sean correctos.
 
-                channel.setCommand("export PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin; $command")
+                val fullCommand = "source /etc/profile; export PATH=\$PATH:/usr/bin:/usr/sbin:/snap/bin; $command"
+                channel.setCommand(fullCommand)
                 
                 val inputStream: InputStream = channel.inputStream
                 val errorStream: InputStream = channel.errStream
@@ -44,18 +47,18 @@ class SshService {
                 val result = inputStream.bufferedReader().use { it.readText() }
                 val errorResult = errorStream.bufferedReader().use { it.readText() }
 
-                // Esperamos a que el canal se cierre para obtener el estado de salida
                 while (!channel.isClosed) {
-                    Thread.sleep(100)
+                    Thread.sleep(50)
                 }
 
-                if (channel.exitStatus != 0 && result.isEmpty()) {
-                    "Error: ${errorResult.ifEmpty { "Código de salida ${channel.exitStatus}" }}"
+                if (channel.exitStatus != 0) {
+                    val errorMsg = errorResult.ifEmpty { result }.ifEmpty { "Error desconocido (code ${channel.exitStatus})" }
+                    "ERROR_SSH: $errorMsg"
                 } else {
                     result
                 }
             } catch (e: Exception) {
-                "Error: ${e.message}"
+                "ERROR_SSH: ${e.message}"
             } finally {
                 channel?.disconnect()
                 session?.disconnect()
