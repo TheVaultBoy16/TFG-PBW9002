@@ -120,7 +120,7 @@ fun LoginScreen(
             placeholder = { Text("-----BEGIN OPENSSH PRIVATE KEY----- ...") },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(150.dp), // Más alto para que sea fácil pegar la clave
+                .height(150.dp),
             maxLines = 10
         )
         

@@ -15,10 +15,10 @@ class SshService {
     suspend fun executeCommand(
         username: String, 
         hostname: String, 
-        privateKey: String, // Ahora recibimos la clave privada como String
+        privateKey: String,
         command: String,
         port: Int = 22,
-        passphrase: String? = null // Opcional, por si la clave RSA tiene contraseña
+        passphrase: String? = null
     ): String {
         return withContext(Dispatchers.IO) {
             var session: Session? = null
@@ -35,7 +35,7 @@ class SshService {
                 
                 val config = Properties()
                 config["StrictHostKeyChecking"] = "no"
-                // Importante: forzamos el uso de autenticación por clave pública
+                // Forzamos el uso de autenticación por clave pública
                 config["PreferredAuthentications"] = "publickey"
                 session.setConfig(config)
                 
