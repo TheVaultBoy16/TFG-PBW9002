@@ -156,7 +156,7 @@ class MainActivity : ComponentActivity() {
                 val name = parts[1]
                 // El estado puede tener varias palabras separadas
                 val state = parts.subList(2, parts.size).joinToString(" ")
-                vms.add(HomeItem(id = parts[0], name = name, state = state, imageRes = R.drawable.virtmanager_94317))
+                vms.add(HomeItem(id = parts[0], name = name, state = state, imageRes = R.drawable.apagada))
             }
         }
         return vms
