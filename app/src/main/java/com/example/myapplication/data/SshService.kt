@@ -15,7 +15,7 @@ class SshService {
     suspend fun executeCommand(
         username: String, 
         hostname: String, 
-        password: String, 
+        privateKey: String,
         command: String,
         port: Int = 22
     ): String {
@@ -23,20 +23,24 @@ class SshService {
             var session: Session? = null
             var channel: ChannelExec? = null
             try {
+                // Limpiar identidades previas
+                jsch.removeAllIdentity()
+                // Añadir la clave privada (RSA)
+                jsch.addIdentity("id_rsa", privateKey.toByteArray(), null, null)
+
                 session = jsch.getSession(username, hostname, port)
-                session.setPassword(password)
                 
                 val config = Properties()
                 config["StrictHostKeyChecking"] = "no"
+                // Forzar autenticación por clave pública
+                config["PreferredAuthentications"] = "publickey"
                 session.setConfig(config)
                 
                 session.connect(5000)
 
                 channel = session.openChannel("exec") as ChannelExec
                 
-                // Forzamos el uso de un shell para asegurar que el PATH y el entorno sean correctos.
-
-                val fullCommand = "source /etc/profile; export PATH=\$PATH:/usr/bin:/usr/sbin:/snap/bin; $command"
+                val fullCommand = "export LC_ALL=C; export PATH=\$PATH:/usr/bin:/usr/sbin:/snap/bin; $command"
                 channel.setCommand(fullCommand)
                 
                 val inputStream: InputStream = channel.inputStream
