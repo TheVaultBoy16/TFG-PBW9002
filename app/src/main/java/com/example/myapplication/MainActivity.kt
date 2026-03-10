@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -18,6 +19,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +31,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.myapplication.data.HomeItem
+import com.example.myapplication.data.SessionManager
 import com.example.myapplication.data.SshService
 import com.example.myapplication.ui.home.HomeDefaultScreen
 import com.example.myapplication.ui.navigation.ApplicationNavGraph
@@ -39,15 +42,19 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val sshService = SshService()
+    private lateinit var sessionManager: SessionManager
 
     private var currentHost = ""
     private var currentUser = ""
     private var currentPass = ""
     private var currentPort = 2222
 
+    private val virshCommand = "export LC_ALL=C; virsh --connect qemu:///system"
+
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        sessionManager = SessionManager(this)
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
@@ -59,6 +66,25 @@ class MainActivity : ComponentActivity() {
                 var selectedItem by remember { mutableStateOf<HomeItem?>(null) }
                 var vmList by remember { mutableStateOf<List<HomeItem>>(emptyList()) }
 
+                LaunchedEffect(Unit) {
+                    val savedSession = sessionManager.getSession()
+                    if (savedSession != null) {
+                        currentUser = savedSession.user
+                        currentHost = savedSession.host
+                        currentPass = savedSession.rsaKey
+                        currentPort = savedSession.port
+                        
+                        val result = sshService.executeCommand(currentUser, currentHost, currentPass, "$virshCommand list --all", currentPort)
+                        if (!result.startsWith("ERROR_SSH:")) {
+                            val parsed = parseVirshOutput(result)
+                            vmList = parsed
+                            if (parsed.isNotEmpty()) {
+                                navController.navigate(Screen.Home.route)
+                            }
+                        }
+                    }
+                }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
@@ -66,10 +92,19 @@ class MainActivity : ComponentActivity() {
                             title = when (currentRoute) {
                                 Screen.VmDetail.route -> selectedItem?.name ?: "Detalle"
                                 Screen.Login.route -> "Añadir conexión"
+                                Screen.Home.route -> "Servidor: $currentHost"
                                 else -> stringResource(id = R.string.app_name)
                             },
                             canNavigateBack = currentRoute != Screen.Default.route,
-                            navigateUp = { navController.popBackStack() }
+                            onBackClick = { navController.popBackStack() },
+                            showLogout = currentRoute == Screen.Home.route,
+                            onLogoutClick = {
+                                sessionManager.clearSession()
+                                vmList = emptyList()
+                                navController.navigate(Screen.Default.route) {
+                                    popUpTo(Screen.Default.route) { inclusive = true }
+                                }
+                            }
                         )
                     }
                 ) { innerPadding ->
@@ -81,21 +116,19 @@ class MainActivity : ComponentActivity() {
                         onLogin = { username, hostname, password, port ->
                             currentUser = username; currentHost = hostname; currentPass = password; currentPort = port
                             scope.launch {
-                                // Forzamos el idioma a inglés por el parser
-                                val command = "export LC_ALL=C; virsh list --all"
+                                val command = "$virshCommand list --all"
                                 val result = sshService.executeCommand(username, hostname, password, command, port)
                                 
                                 if (!result.startsWith("ERROR_SSH:")) {
                                     val parsedVms = parseVirshOutput(result)
-                                    if (parsedVms.isNotEmpty()) {
-                                        vmList = parsedVms
-                                        navController.navigate(Screen.Home.route)
-                                    } else {
-                                        Log.d("VIRSH_DEBUG", "Salida: $result")
-                                        Toast.makeText(this@MainActivity, "No se encontraron MVs o formato desconocido", Toast.LENGTH_LONG).show()
-                                        vmList = emptyList()
-                                        navController.navigate(Screen.Home.route)
+                                    vmList = parsedVms
+                                    sessionManager.saveSession(username, hostname, password, port)
+                                    
+                                    if (parsedVms.isEmpty()) {
+                                        val preview = if (result.length > 40) result.take(40) + "..." else result
+                                        Toast.makeText(this@MainActivity, "Conectado, pero lista vacía. Respuesta: $preview", Toast.LENGTH_LONG).show()
                                     }
+                                    navController.navigate(Screen.Home.route)
                                 } else {
                                     Toast.makeText(this@MainActivity, "Fallo: $result", Toast.LENGTH_LONG).show()
                                 }
@@ -106,31 +139,27 @@ class MainActivity : ComponentActivity() {
                                 val isRunning = item.state.lowercase().contains("running")
                                 val action = if (isRunning) "shutdown" else "start"
                                 val targetState = if (isRunning) "shut off" else "running"
-                                
                                 vmList = vmList.map { if (it.name == item.name) it.copy(state = "procesando...") else it }
-                                
-                                sshService.executeCommand(currentUser, currentHost, currentPass, "export LC_ALL=C; virsh $action ${item.name}", currentPort)
-                                
-                                repeat(10) { 
+                                sshService.executeCommand(currentUser, currentHost, currentPass, "$virshCommand $action ${item.name}", currentPort)
+                                repeat(15) { 
                                     delay(4000)
-                                    val r = sshService.executeCommand(currentUser, currentHost, currentPass, "export LC_ALL=C; virsh list --all", currentPort)
+                                    val r = sshService.executeCommand(currentUser, currentHost, currentPass, "$virshCommand list --all", currentPort)
                                     if (!r.startsWith("ERROR_SSH:")) {
-                                        val newList = parseVirshOutput(r)
-                                        vmList = newList
-                                        if (newList.find { it.name == item.name }?.state?.lowercase()?.contains(targetState) == true) return@launch
+                                        vmList = parseVirshOutput(r)
+                                        if (vmList.find { it.name == item.name }?.state?.lowercase()?.contains(targetState) == true) return@launch
                                     }
                                 }
                             }
                         },
                         onTakeSnapshot = { item, snapshotName ->
                             scope.launch {
-                                val result = sshService.executeCommand(currentUser, currentHost, currentPass, "virsh snapshot-create-as ${item.name} $snapshotName", currentPort)
-                                Toast.makeText(this@MainActivity, if (result.startsWith("ERROR_SSH:")) "Error al tomar snapshot" else "Snapshot OK", Toast.LENGTH_SHORT).show()
+                                val result = sshService.executeCommand(currentUser, currentHost, currentPass, "$virshCommand snapshot-create-as ${item.name} $snapshotName", currentPort)
+                                Toast.makeText(this@MainActivity, if (result.startsWith("ERROR_SSH:")) "Error al crear snapshot" else "Snapshot OK", Toast.LENGTH_SHORT).show()
                             }
                         },
                         onRestoreSnapshot = { item, snapshotName ->
                             scope.launch {
-                                val result = sshService.executeCommand(currentUser, currentHost, currentPass, "virsh snapshot-revert ${item.name} $snapshotName", currentPort)
+                                val result = sshService.executeCommand(currentUser, currentHost, currentPass, "$virshCommand snapshot-revert ${item.name} $snapshotName", currentPort)
                                 Toast.makeText(this@MainActivity, if (result.startsWith("ERROR_SSH:")) "Error al restaurar" else "Restaurado OK", Toast.LENGTH_SHORT).show()
                             }
                         },
@@ -142,23 +171,34 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun parseVirshOutput(output: String): List<HomeItem> {
+        Log.d("VIRSH_PARSER", "Iniciando parseo de la salida del servidor.")
+        Log.d("VIRSH_PARSER", "Salida recibida:\n$output")
         val lines = output.lines()
         val vms = mutableListOf<HomeItem>()
         for (line in lines) {
             val t = line.trim()
-            // Ignoramos cabeceras y líneas vacías
-            if (t.isEmpty() || t.startsWith("Id") || t.startsWith("---") || t.contains("Name") || t.contains("State")) continue
+            Log.d("VIRSH_PARSER", "Procesando línea: '$t'")
+
+            if (t.isEmpty() || t.lowercase().startsWith("id") || t.startsWith("---")) {
+                Log.d("VIRSH_PARSER", "Línea ignorada (cabecera o vacía).")
+                continue
+            }
             
-            // Separamos por espacios y filtramos elementos vacíos
             val parts = t.split(Regex("\\s+")).filter { it.isNotBlank() }
+            Log.d("VIRSH_PARSER", "Partes obtenidas: $parts")
             
             if (parts.size >= 3) {
+                val id = parts[0]
                 val name = parts[1]
-                // El estado puede tener varias palabras separadas
                 val state = parts.subList(2, parts.size).joinToString(" ")
-                vms.add(HomeItem(id = parts[0], name = name, state = state, imageRes = R.drawable.apagada))
+                
+                Log.d("VIRSH_PARSER", "VM Detectada -> ID: $id, Nombre: $name, Estado: $state")
+                vms.add(HomeItem(id = id, name = name, state = state, imageRes = R.drawable.apagada))
+            } else {
+                Log.w("VIRSH_PARSER", "Línea no reconocida (no tiene 3+ partes): '$t'")
             }
         }
+        Log.d("VIRSH_PARSER", "Parseo finalizado. Total de VMs encontradas: ${vms.size}")
         return vms
     }
 }
@@ -168,7 +208,9 @@ class MainActivity : ComponentActivity() {
 fun MyTopAppBar(
     title: String,
     canNavigateBack: Boolean,
-    navigateUp: () -> Unit = {},
+    onBackClick: () -> Unit = {},
+    showLogout: Boolean = false,
+    onLogoutClick: () -> Unit = {},
     scrollBehavior: TopAppBarScrollBehavior? = null,
     modifier: Modifier = Modifier
 ){
@@ -178,8 +220,15 @@ fun MyTopAppBar(
         scrollBehavior = scrollBehavior,
         navigationIcon = {
             if (canNavigateBack) {
-                IconButton(onClick = navigateUp) {
+                IconButton(onClick = onBackClick) {
                     Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(id = R.string.back_button))
+                }
+            }
+        },
+        actions = {
+            if (showLogout) {
+                IconButton(onClick = onLogoutClick) {
+                    Icon(imageVector = Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Cerrar sesión")
                 }
             }
         }

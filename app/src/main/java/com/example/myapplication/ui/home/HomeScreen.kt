@@ -3,9 +3,11 @@ package com.example.myapplication.ui.home
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -39,17 +41,30 @@ fun HomeScreen(
     onToggleVm: (HomeItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(vmList) { item ->
-            HomeItemCard(
-                item = item,
-                onToggleClick = { onToggleVm(item) },
-                modifier = Modifier.clickable { onItemClick(item) }
+    if (vmList.isEmpty()) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "No se encontraron máquinas virtuales en este servidor.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.Gray
             )
+        }
+    } else {
+        LazyColumn(
+            modifier = modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(vmList) { item ->
+                HomeItemCard(
+                    item = item,
+                    onToggleClick = { onToggleVm(item) },
+                    modifier = Modifier.clickable { onItemClick(item) }
+                )
+            }
         }
     }
 }
@@ -64,7 +79,6 @@ fun HomeItemCard(
     val displayState = if (isRunning) "Ejecutándose" else "Apagada"
     val stateColor = if (isRunning) Color(0xFF4CAF50) else Color.Gray
     
-    // Seleccionamos la imagen según el estado
     val imageRes = if (isRunning) R.drawable.ejecutandose else R.drawable.apagada
 
     Card(
@@ -81,7 +95,7 @@ fun HomeItemCard(
                 painter = painterResource(id = imageRes),
                 contentDescription = null,
                 modifier = Modifier
-                    .size(60.dp)
+                    .size(80.dp)
                     .clip(RoundedCornerShape(8.dp)),
                 contentScale = ContentScale.Crop
             )
@@ -105,7 +119,7 @@ fun HomeItemCard(
             IconButton(onClick = onToggleClick) {
                 Icon(
                     imageVector = if (isRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                    contentDescription = if (isRunning) "Acción" else "",
+                    contentDescription = null,
                     tint = if (isRunning) Color(0xFFF44336) else Color(0xFF4CAF50)
                 )
             }
