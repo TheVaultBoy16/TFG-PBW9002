@@ -55,7 +55,6 @@ class MainActivity : ComponentActivity() {
                 val currentRoute = navBackStackEntry?.destination?.route
                 val scope = rememberCoroutineScope()
 
-                // Obtenemos el ViewModel (sobrevive a la rotación)
                 val homeViewModel: HomeViewModel = viewModel(
                     factory = HomeViewModelFactory(sshService, sessionManager)
                 )
@@ -63,9 +62,10 @@ class MainActivity : ComponentActivity() {
                 val vmList by homeViewModel.vmList.collectAsState()
                 val selectedItem by homeViewModel.selectedItem.collectAsState()
 
-                // Lógica de Inicio Automático al abrir la app
+                // Lógica de Inicio Automático mejorada
                 LaunchedEffect(Unit) {
-                    if (currentRoute == Screen.Default.route) {
+                    val savedSession = sessionManager.getSession()
+                    if (savedSession != null) {
                         homeViewModel.refreshOnce { success ->
                             if (success) {
                                 navController.navigate(Screen.Home.route) {
@@ -76,7 +76,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Control del Polling (solo en pantalla Home)
+                // Control del Polling
                 LaunchedEffect(currentRoute) {
                     if (currentRoute == Screen.Home.route) {
                         homeViewModel.startPolling()
@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
                             title = when (currentRoute) {
                                 Screen.VmDetail.route -> selectedItem?.name ?: "Detalle"
                                 Screen.Login.route -> "Añadir conexión"
-                                Screen.Home.route -> "Hipervisor Activo"
+                                Screen.Home.route -> "Servidor Activo"
                                 else -> stringResource(id = R.string.app_name)
                             },
                             canNavigateBack = currentRoute == Screen.VmDetail.route || currentRoute == Screen.Login.route,

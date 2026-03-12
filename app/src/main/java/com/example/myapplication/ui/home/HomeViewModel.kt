@@ -3,6 +3,7 @@ package com.example.myapplication.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.myapplication.R
 import com.example.myapplication.data.HomeItem
 import com.example.myapplication.data.SessionManager
 import com.example.myapplication.data.SshService
@@ -52,9 +53,13 @@ class HomeViewModel(
     }
 
     suspend fun login(user: String, host: String, key: String, port: Int): Boolean {
-        val result = sshService.executeCommand(user, host, key, "$virshCommand list --all", port)
+        // Importante: El trim() asegura que no haya caracteres invisibles en la clave RSA
+        val cleanKey = key.trim()
+        val result = sshService.executeCommand(user, host, cleanKey, "$virshCommand list --all", port)
+        
         return if (!result.startsWith("ERROR_SSH:")) {
-            sessionManager.saveSession(user, host, key, port)
+            // Guardamos la sesión ANTES de actualizar la UI para asegurar persistencia
+            sessionManager.saveSession(user, host, cleanKey, port)
             _vmList.value = parseVirshOutput(result)
             true
         } else {
@@ -120,7 +125,10 @@ class HomeViewModel(
             if (t.isEmpty() || t.lowercase().startsWith("id") || t.startsWith("---")) continue
             val parts = t.split(Regex("\\s+")).filter { it.isNotBlank() }
             if (parts.size >= 3) {
-                vms.add(HomeItem(id = parts[0], name = parts[1], state = parts.subList(2, parts.size).joinToString(" "), imageRes = 0))
+                val state = parts.subList(2, parts.size).joinToString(" ")
+                val isRunning = state.lowercase().contains("running")
+                val img = if (isRunning) R.drawable.ejecutandose else R.drawable.apagada
+                vms.add(HomeItem(id = parts[0], name = parts[1], state = state, imageRes = img))
             }
         }
         return vms
