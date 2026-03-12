@@ -76,10 +76,10 @@ class MainActivity : ComponentActivity() {
                         
                         val result = sshService.executeCommand(currentUser, currentHost, currentPass, "$virshCommand list --all", currentPort)
                         if (!result.startsWith("ERROR_SSH:")) {
-                            val parsed = parseVirshOutput(result)
-                            vmList = parsed
-                            if (parsed.isNotEmpty()) {
-                                navController.navigate(Screen.Home.route)
+                            vmList = parseVirshOutput(result)
+                            // Navegamos a Home y limpiamos todo el historial previo
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
                             }
                         }
                     }
@@ -95,14 +95,14 @@ class MainActivity : ComponentActivity() {
                                 Screen.Home.route -> "Servidor: $currentHost"
                                 else -> stringResource(id = R.string.app_name)
                             },
-                            canNavigateBack = currentRoute != Screen.Default.route,
+                            canNavigateBack = currentRoute == Screen.VmDetail.route || currentRoute == Screen.Login.route,
                             onBackClick = { navController.popBackStack() },
                             showLogout = currentRoute == Screen.Home.route,
                             onLogoutClick = {
                                 sessionManager.clearSession()
                                 vmList = emptyList()
                                 navController.navigate(Screen.Default.route) {
-                                    popUpTo(Screen.Default.route) { inclusive = true }
+                                    popUpTo(0) { inclusive = true }
                                 }
                             }
                         )
@@ -124,11 +124,10 @@ class MainActivity : ComponentActivity() {
                                     vmList = parsedVms
                                     sessionManager.saveSession(username, hostname, password, port)
                                     
-                                    if (parsedVms.isEmpty()) {
-                                        val preview = if (result.length > 40) result.take(40) + "..." else result
-                                        Toast.makeText(this@MainActivity, "Conectado, pero lista vacía. Respuesta: $preview", Toast.LENGTH_LONG).show()
+                                    // Navegamos a Home y limpiamos el historial (Default y Login)
+                                    navController.navigate(Screen.Home.route) {
+                                        popUpTo(Screen.Default.route) { inclusive = true }
                                     }
-                                    navController.navigate(Screen.Home.route)
                                 } else {
                                     Toast.makeText(this@MainActivity, "Fallo: $result", Toast.LENGTH_LONG).show()
                                 }
@@ -171,34 +170,19 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun parseVirshOutput(output: String): List<HomeItem> {
-        Log.d("VIRSH_PARSER", "Iniciando parseo de la salida del servidor.")
-        Log.d("VIRSH_PARSER", "Salida recibida:\n$output")
         val lines = output.lines()
         val vms = mutableListOf<HomeItem>()
         for (line in lines) {
             val t = line.trim()
-            Log.d("VIRSH_PARSER", "Procesando línea: '$t'")
-
-            if (t.isEmpty() || t.lowercase().startsWith("id") || t.startsWith("---")) {
-                Log.d("VIRSH_PARSER", "Línea ignorada (cabecera o vacía).")
-                continue
-            }
-            
+            if (t.isEmpty() || t.lowercase().startsWith("id") || t.startsWith("---")) continue
             val parts = t.split(Regex("\\s+")).filter { it.isNotBlank() }
-            Log.d("VIRSH_PARSER", "Partes obtenidas: $parts")
-            
             if (parts.size >= 3) {
                 val id = parts[0]
                 val name = parts[1]
                 val state = parts.subList(2, parts.size).joinToString(" ")
-                
-                Log.d("VIRSH_PARSER", "VM Detectada -> ID: $id, Nombre: $name, Estado: $state")
                 vms.add(HomeItem(id = id, name = name, state = state, imageRes = R.drawable.apagada))
-            } else {
-                Log.w("VIRSH_PARSER", "Línea no reconocida (no tiene 3+ partes): '$t'")
             }
         }
-        Log.d("VIRSH_PARSER", "Parseo finalizado. Total de VMs encontradas: ${vms.size}")
         return vms
     }
 }
