@@ -66,6 +66,7 @@ class MainActivity : ComponentActivity() {
                 var selectedItem by remember { mutableStateOf<HomeItem?>(null) }
                 var vmList by remember { mutableStateOf<List<HomeItem>>(emptyList()) }
 
+                //Intento de Login Automático al iniciar
                 LaunchedEffect(Unit) {
                     val savedSession = sessionManager.getSession()
                     if (savedSession != null) {
@@ -77,9 +78,21 @@ class MainActivity : ComponentActivity() {
                         val result = sshService.executeCommand(currentUser, currentHost, currentPass, "$virshCommand list --all", currentPort)
                         if (!result.startsWith("ERROR_SSH:")) {
                             vmList = parseVirshOutput(result)
-                            // Navegamos a Home y limpiamos todo el historial previo
                             navController.navigate(Screen.Home.route) {
                                 popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                            }
+                        }
+                    }
+                }
+
+                //Actualiza la lista cada 10 segundos si estamos en Home
+                LaunchedEffect(currentRoute, currentUser, currentHost) {
+                    if (currentRoute == Screen.Home.route && currentUser.isNotEmpty()) {
+                        while (true) {
+                            delay(10000) // Esperar 10 segundos
+                            val result = sshService.executeCommand(currentUser, currentHost, currentPass, "$virshCommand list --all", currentPort)
+                            if (!result.startsWith("ERROR_SSH:")) {
+                                vmList = parseVirshOutput(result)
                             }
                         }
                     }
@@ -124,7 +137,6 @@ class MainActivity : ComponentActivity() {
                                     vmList = parsedVms
                                     sessionManager.saveSession(username, hostname, password, port)
                                     
-                                    // Navegamos a Home y limpiamos el historial (Default y Login)
                                     navController.navigate(Screen.Home.route) {
                                         popUpTo(Screen.Default.route) { inclusive = true }
                                     }
@@ -140,8 +152,10 @@ class MainActivity : ComponentActivity() {
                                 val targetState = if (isRunning) "shut off" else "running"
                                 vmList = vmList.map { if (it.name == item.name) it.copy(state = "procesando...") else it }
                                 sshService.executeCommand(currentUser, currentHost, currentPass, "$virshCommand $action ${item.name}", currentPort)
-                                repeat(15) { 
-                                    delay(4000)
+                                
+                                // Recarga rápida tras acción propia
+                                repeat(10) { 
+                                    delay(3000)
                                     val r = sshService.executeCommand(currentUser, currentHost, currentPass, "$virshCommand list --all", currentPort)
                                     if (!r.startsWith("ERROR_SSH:")) {
                                         vmList = parseVirshOutput(r)
