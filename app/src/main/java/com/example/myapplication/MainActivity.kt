@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
                             title = when (currentRoute) {
                                 Screen.VmDetail.route -> selectedItem?.name ?: "Detalle"
                                 Screen.Login.route -> "Añadir conexión"
-                                Screen.Home.route -> "Servidor Activo"
+                                Screen.Home.route -> "${sessionManager.getSession()?.host ?: "Sin conexión"}"
                                 else -> stringResource(id = R.string.app_name)
                             },
                             canNavigateBack = currentRoute == Screen.VmDetail.route || currentRoute == Screen.Login.route,
