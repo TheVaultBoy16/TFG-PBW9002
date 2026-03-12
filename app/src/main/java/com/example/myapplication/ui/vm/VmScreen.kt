@@ -41,7 +41,7 @@ fun VmScreen(
 ) {
     var snapshotName by remember { mutableStateOf("") }
 
-    // Lógica idéntica a HomeScreen
+
     val isRunning = item.state.lowercase().contains("running")
     val displayState = if (isRunning) "Ejecutándose" else "Apagada"
     val stateColor = if (isRunning) Color(0xFF4CAF50) else Color.Gray

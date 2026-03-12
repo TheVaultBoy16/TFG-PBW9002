@@ -54,7 +54,7 @@ fun LoginScreen(
         uri?.let {
             try {
                 context.contentResolver.openInputStream(it)?.use { inputStream ->
-                    // Usamos trim() para limpiar posibles espacios o saltos de línea invisibles
+
                     val content = inputStream.bufferedReader().use { reader -> reader.readText() }.trim()
                     if (content.isNotEmpty()) {
                         privateKey = content
