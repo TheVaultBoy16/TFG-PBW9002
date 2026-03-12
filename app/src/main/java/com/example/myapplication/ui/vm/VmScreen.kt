@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -22,6 +23,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -37,6 +41,12 @@ fun VmScreen(
 ) {
     var snapshotName by remember { mutableStateOf("") }
 
+    // Lógica idéntica a HomeScreen
+    val isRunning = item.state.lowercase().contains("running")
+    val displayState = if (isRunning) "Ejecutándose" else "Apagada"
+    val stateColor = if (isRunning) Color(0xFF4CAF50) else Color.Gray
+    val imageRes = if (isRunning) R.drawable.ejecutandose else R.drawable.apagada
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -48,9 +58,12 @@ fun VmScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Image(
-                painter = painterResource(id = item.imageRes),
+                painter = painterResource(id = imageRes),
                 contentDescription = "VM Image",
-                modifier = Modifier.size(100.dp)
+                modifier = Modifier
+                    .size(100.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
             )
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -59,8 +72,15 @@ fun VmScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(text = item.name, style = MaterialTheme.typography.headlineSmall)
-                Text(text = item.state, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = item.name, 
+                    style = MaterialTheme.typography.headlineSmall
+                )
+                Text(
+                    text = displayState, 
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = stateColor // Aplicamos el color correspondiente
+                )
             }
         }
 
