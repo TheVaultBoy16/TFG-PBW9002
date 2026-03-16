@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -23,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +35,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.R
 import com.example.myapplication.data.HomeItem
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
@@ -41,6 +44,9 @@ fun HomeScreen(
     onToggleVm: (HomeItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
     if (vmList.isEmpty()) {
         Box(
             modifier = modifier.fillMaxSize(),
@@ -54,6 +60,7 @@ fun HomeScreen(
         }
     } else {
         LazyColumn(
+            state = listState,
             modifier = modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -61,7 +68,15 @@ fun HomeScreen(
             items(vmList) { item ->
                 HomeItemCard(
                     item = item,
-                    onToggleClick = { onToggleVm(item) },
+                    onToggleClick = {
+                        val isRunning = item.state.lowercase().contains("running")
+                        if (!isRunning) {
+                            scope.launch {
+                                listState.animateScrollToItem(0)
+                            }
+                        }
+                        onToggleVm(item)
+                    },
                     modifier = Modifier.clickable { onItemClick(item) }
                 )
             }
