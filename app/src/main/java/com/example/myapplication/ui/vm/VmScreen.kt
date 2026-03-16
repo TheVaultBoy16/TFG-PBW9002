@@ -90,7 +90,7 @@ fun VmScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // SECCIÓN: TOMAR INSTANTÁNEA
+        // Sección de tomar instantánea
         Text(text = "Crear Instantánea", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(8.dp))
         Row(
@@ -115,7 +115,7 @@ fun VmScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // SECCIÓN: RESTAURAR/BORRAR INSTANTÁNEA (LISTA DESPLEGABLE)
+        // Sección restauración y borrado de instantáneas (lista de instantáneas)
         Text(text = "Gestionar Instantáneas", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(8.dp))
         
@@ -173,7 +173,7 @@ fun VmScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // SECCIÓN: GESTIÓN DE MEMORIA (SAVE/RESTORE)
+        // Sección gestión de memoria (Save/Restore)
         Text(text = "Gestión de Memoria", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(8.dp))
         Row(
