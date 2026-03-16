@@ -63,8 +63,9 @@ class MainActivity : ComponentActivity() {
                 val selectedItem by homeViewModel.selectedItem.collectAsState()
                 val snapshotList by homeViewModel.snapshotList.collectAsState()
 
-                LaunchedEffect(Unit) {
-                    if (currentRoute == Screen.Default.route || currentRoute == null) {
+
+                LaunchedEffect(currentRoute) {
+                    if (currentRoute == Screen.Default.route) {
                         homeViewModel.refreshOnce { success ->
                             if (success) {
                                 navController.navigate(Screen.Home.route) {
