@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
 
                 val vmList by homeViewModel.vmList.collectAsState()
                 val selectedItem by homeViewModel.selectedItem.collectAsState()
+                val snapshotList by homeViewModel.snapshotList.collectAsState()
 
                 LaunchedEffect(Unit) {
                     if (currentRoute == Screen.Default.route || currentRoute == null) {
@@ -110,6 +111,7 @@ class MainActivity : ComponentActivity() {
                         selectedItem = selectedItem,
                         onSelectItem = { homeViewModel.selectItem(it) },
                         vmList = vmList,
+                        snapshotList = snapshotList,
                         onLogin = { username, hostname, password, port ->
                             scope.launch {
                                 val success = homeViewModel.login(username, hostname, password, port)
@@ -134,6 +136,12 @@ class MainActivity : ComponentActivity() {
                                 val res = homeViewModel.restoreSnapshot(item, name)
                                 Toast.makeText(this@MainActivity, if(res.startsWith("ERROR")) res else "Restaurado OK", Toast.LENGTH_SHORT).show()
                             } 
+                        },
+                        onDeleteSnapshot = { item, name ->
+                            scope.launch {
+                                val res = homeViewModel.deleteSnapshot(item, name)
+                                Toast.makeText(this@MainActivity, if(res.startsWith("ERROR")) res else "Instantánea borrada", Toast.LENGTH_SHORT).show()
+                            }
                         },
                         onSaveVm = { item ->
                             scope.launch {

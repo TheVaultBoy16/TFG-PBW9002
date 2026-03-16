@@ -29,9 +29,11 @@ fun ApplicationNavGraph(
     onToggleVm: (HomeItem) -> Unit,
     onTakeSnapshot: (HomeItem, String) -> Unit,
     onRestoreSnapshot: (HomeItem, String) -> Unit,
+    onDeleteSnapshot: (HomeItem, String) -> Unit,
     onSaveVm: (HomeItem) -> Unit,
     onRestoreVm: (HomeItem) -> Unit,
-    vmList: List<HomeItem>
+    vmList: List<HomeItem>,
+    snapshotList: List<String>
 ) {
     NavHost(
         navController = navController,
@@ -55,8 +57,10 @@ fun ApplicationNavGraph(
             selectedItem?.let { item ->
                 VmScreen(
                     item = item,
+                    snapshotList = snapshotList,
                     onTakeSnapshot = { name -> onTakeSnapshot(item, name) },
                     onRestoreSnapshot = { name -> onRestoreSnapshot(item, name) },
+                    onDeleteSnapshot = { name -> onDeleteSnapshot(item, name) },
                     onSaveVm = { onSaveVm(item) },
                     onRestoreVm = { onRestoreVm(item) }
                 )

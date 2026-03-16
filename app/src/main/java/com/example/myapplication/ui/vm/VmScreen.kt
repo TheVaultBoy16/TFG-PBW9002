@@ -13,6 +13,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -32,16 +37,21 @@ import androidx.compose.ui.unit.dp
 import com.example.myapplication.R
 import com.example.myapplication.data.HomeItem
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VmScreen(
     item: HomeItem,
+    snapshotList: List<String>,
     onTakeSnapshot: (String) -> Unit,
     onRestoreSnapshot: (String) -> Unit,
+    onDeleteSnapshot: (String) -> Unit,
     onSaveVm: () -> Unit,
     onRestoreVm: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var snapshotName by remember { mutableStateOf("") }
+    var newSnapshotName by remember { mutableStateOf("") }
+    var selectedSnapshot by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
 
     val isRunning = item.state.lowercase().contains("running")
     val displayState = if (isRunning) "Ejecutándose" else "Apagada"
@@ -78,53 +88,103 @@ fun VmScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Sección Snapshots
-        Text(text = "Instantáneas (Snapshots)", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
+        // SECCIÓN: TOMAR INSTANTÁNEA
+        Text(text = "Crear Instantánea", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = snapshotName,
-            onValueChange = { snapshotName = it },
-            label = { Text("Nombre de la instantánea") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-        Spacer(modifier = Modifier.height(12.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(onClick = { onTakeSnapshot(snapshotName) }, modifier = Modifier.weight(1f), enabled = snapshotName.isNotEmpty()) {
+            OutlinedTextField(
+                value = newSnapshotName,
+                onValueChange = { newSnapshotName = it },
+                label = { Text("Nombre") },
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            Button(
+                onClick = { onTakeSnapshot(newSnapshotName); newSnapshotName = "" },
+                enabled = newSnapshotName.isNotEmpty()
+            ) {
                 Text("Tomar")
-            }
-            Button(onClick = { onRestoreSnapshot(snapshotName) }, modifier = Modifier.weight(1f), enabled = snapshotName.isNotEmpty()) {
-                Text("Restaurar")
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Sección Guardado de Estado
+        // SECCIÓN: RESTAURAR/BORRAR INSTANTÁNEA (LISTA DESPLEGABLE)
+        Text(text = "Gestionar Instantáneas", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedTextField(
+                value = if (selectedSnapshot.isEmpty()) "Selecciona una instantánea" else selectedSnapshot,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier
+                    .menuAnchor()
+                    .fillMaxWidth()
+            )
+
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                snapshotList.forEach { snapshot ->
+                    DropdownMenuItem(
+                        text = { Text(snapshot) },
+                        onClick = {
+                            selectedSnapshot = snapshot
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        Button(
+            onClick = { onRestoreSnapshot(selectedSnapshot) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = selectedSnapshot.isNotEmpty()
+        ) {
+            Text("Restaurar Seleccionada")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(
+            onClick = { onDeleteSnapshot(selectedSnapshot); selectedSnapshot = "" },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = selectedSnapshot.isNotEmpty(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+        ) {
+            Text("Borrar Seleccionada")
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // SECCIÓN: GESTIÓN DE MEMORIA (SAVE/RESTORE)
         Text(text = "Gestión de Memoria", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Button(
-                onClick = onSaveVm, 
-                modifier = Modifier.weight(1f),
-                enabled = isRunning
-            ) {
-                Text("Guardar Estado")
+            Button(onClick = onSaveVm, modifier = Modifier.weight(1f), enabled = isRunning) {
+                Text("Guardar")
             }
-            Button(
-                onClick = onRestoreVm, 
-                modifier = Modifier.weight(1f),
-                enabled = !isRunning
-            ) {
-                Text("Cargar Estado")
+            Button(onClick = onRestoreVm, modifier = Modifier.weight(1f), enabled = !isRunning) {
+                Text("Cargar")
             }
         }
     }
@@ -134,9 +194,11 @@ fun VmScreen(
 @Composable
 fun VmScreenPreview() {
     VmScreen(
-        item = HomeItem("1", "MV de Prueba", "running", R.drawable.ic_launcher_foreground),
+        item = HomeItem("1", "MV de Prueba", "running", R.drawable.apagada),
+        snapshotList = listOf("Snap1", "Snap2"),
         onTakeSnapshot = {},
         onRestoreSnapshot = {},
+        onDeleteSnapshot = {},
         onSaveVm = {},
         onRestoreVm = {}
     )
