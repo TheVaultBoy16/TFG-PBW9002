@@ -37,10 +37,11 @@ fun VmScreen(
     item: HomeItem,
     onTakeSnapshot: (String) -> Unit,
     onRestoreSnapshot: (String) -> Unit,
+    onSaveVm: () -> Unit,
+    onRestoreVm: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var snapshotName by remember { mutableStateOf("") }
-
 
     val isRunning = item.state.lowercase().contains("running")
     val displayState = if (isRunning) "Ejecutándose" else "Apagada"
@@ -72,20 +73,16 @@ fun VmScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    text = item.name, 
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Text(
-                    text = displayState, 
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = stateColor // Aplicamos el color correspondiente
-                )
+                Text(text = item.name, style = MaterialTheme.typography.headlineSmall)
+                Text(text = displayState, style = MaterialTheme.typography.bodyMedium, color = stateColor)
             }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        // Sección Snapshots
+        Text(text = "Instantáneas (Snapshots)", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = snapshotName,
             onValueChange = { snapshotName = it },
@@ -93,27 +90,41 @@ fun VmScreen(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Button(onClick = { onTakeSnapshot(snapshotName) }, modifier = Modifier.weight(1f), enabled = snapshotName.isNotEmpty()) {
+                Text("Tomar")
+            }
+            Button(onClick = { onRestoreSnapshot(snapshotName) }, modifier = Modifier.weight(1f), enabled = snapshotName.isNotEmpty()) {
+                Text("Restaurar")
+            }
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Sección Guardado de Estado
+        Text(text = "Gestión de Memoria", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Button(
-                onClick = { if (snapshotName.isNotEmpty()) onTakeSnapshot(snapshotName) },
+                onClick = onSaveVm, 
                 modifier = Modifier.weight(1f),
-                enabled = snapshotName.isNotEmpty()
+                enabled = isRunning
             ) {
-                Text("Tomar")
+                Text("Guardar Estado")
             }
-
             Button(
-                onClick = { if (snapshotName.isNotEmpty()) onRestoreSnapshot(snapshotName) },
+                onClick = onRestoreVm, 
                 modifier = Modifier.weight(1f),
-                enabled = snapshotName.isNotEmpty()
+                enabled = !isRunning
             ) {
-                Text("Restaurar")
+                Text("Cargar Estado")
             }
         }
     }
@@ -125,6 +136,8 @@ fun VmScreenPreview() {
     VmScreen(
         item = HomeItem("1", "MV de Prueba", "running", R.drawable.ic_launcher_foreground),
         onTakeSnapshot = {},
-        onRestoreSnapshot = {}
+        onRestoreSnapshot = {},
+        onSaveVm = {},
+        onRestoreVm = {}
     )
 }

@@ -62,10 +62,8 @@ class MainActivity : ComponentActivity() {
                 val vmList by homeViewModel.vmList.collectAsState()
                 val selectedItem by homeViewModel.selectedItem.collectAsState()
 
-                // Lógica de Inicio Automático mejorada
                 LaunchedEffect(Unit) {
-                    val savedSession = sessionManager.getSession()
-                    if (savedSession != null) {
+                    if (currentRoute == Screen.Default.route || currentRoute == null) {
                         homeViewModel.refreshOnce { success ->
                             if (success) {
                                 navController.navigate(Screen.Home.route) {
@@ -76,7 +74,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Control del Polling
                 LaunchedEffect(currentRoute) {
                     if (currentRoute == Screen.Home.route) {
                         homeViewModel.startPolling()
@@ -92,7 +89,7 @@ class MainActivity : ComponentActivity() {
                             title = when (currentRoute) {
                                 Screen.VmDetail.route -> selectedItem?.name ?: "Detalle"
                                 Screen.Login.route -> "Añadir conexión"
-                                Screen.Home.route -> "${sessionManager.getSession()?.host ?: "Sin conexión"}"
+                                Screen.Home.route -> "Hipervisor Activo"
                                 else -> stringResource(id = R.string.app_name)
                             },
                             canNavigateBack = currentRoute == Screen.VmDetail.route || currentRoute == Screen.Login.route,
@@ -136,6 +133,18 @@ class MainActivity : ComponentActivity() {
                             scope.launch {
                                 val res = homeViewModel.restoreSnapshot(item, name)
                                 Toast.makeText(this@MainActivity, if(res.startsWith("ERROR")) res else "Restaurado OK", Toast.LENGTH_SHORT).show()
+                            } 
+                        },
+                        onSaveVm = { item ->
+                            scope.launch {
+                                val res = homeViewModel.saveVm(item)
+                                Toast.makeText(this@MainActivity, if(res.startsWith("ERROR")) res else "Estado guardado en disco", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onRestoreVm = { item ->
+                            scope.launch {
+                                val res = homeViewModel.restoreVm(item)
+                                Toast.makeText(this@MainActivity, if(res.startsWith("ERROR")) res else "Estado restaurado desde disco", Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.padding(innerPadding)

@@ -53,12 +53,10 @@ class HomeViewModel(
     }
 
     suspend fun login(user: String, host: String, key: String, port: Int): Boolean {
-        // Importante: El trim() asegura que no haya caracteres invisibles en la clave RSA
         val cleanKey = key.trim()
         val result = sshService.executeCommand(user, host, cleanKey, "$virshCommand list --all", port)
         
         return if (!result.startsWith("ERROR_SSH:")) {
-            // Guardamos la sesión ANTES de actualizar la UI para asegurar persistencia
             sessionManager.saveSession(user, host, cleanKey, port)
             _vmList.value = parseVirshOutput(result)
             true
@@ -92,8 +90,7 @@ class HomeViewModel(
             val targetState = if (isRunning) "shut off" else "running"
 
             _vmList.value = _vmList.value.map { if (it.name == item.name) it.copy(state = "procesando...") else it }
-            
-            sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand $action ${item.name}", session.port)
+            sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand $action \"${item.name}\"", session.port)
             
             repeat(10) {
                 delay(4000)
@@ -109,12 +106,29 @@ class HomeViewModel(
 
     suspend fun takeSnapshot(item: HomeItem, name: String): String {
         val session = sessionManager.getSession() ?: return "Error de sesión"
-        return sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand snapshot-create-as ${item.name} $name", session.port)
+        return sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand snapshot-create-as \"${item.name}\" \"$name\"", session.port)
     }
 
     suspend fun restoreSnapshot(item: HomeItem, name: String): String {
         val session = sessionManager.getSession() ?: return "Error de sesión"
-        return sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand snapshot-revert ${item.name} $name", session.port)
+        return sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand snapshot-revert \"${item.name}\" \"$name\"", session.port)
+    }
+
+    suspend fun saveVm(item: HomeItem): String {
+        val session = sessionManager.getSession() ?: return "Error de sesión"
+        // Cambiamos a una ruta donde libvirt suele tener más permisos
+        val path = "/var/lib/libvirt/images/${item.name}.save"
+        val result = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo $virshCommand save \"${item.name}\" \"$path\"", session.port)
+        refreshOnce()
+        return result
+    }
+
+    suspend fun restoreVm(item: HomeItem): String {
+        val session = sessionManager.getSession() ?: return "Error de sesión"
+        val path = "/var/lib/libvirt/images/${item.name}.save"
+        val result = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo $virshCommand restore \"$path\"", session.port)
+        refreshOnce()
+        return result
     }
 
     private fun parseVirshOutput(output: String): List<HomeItem> {

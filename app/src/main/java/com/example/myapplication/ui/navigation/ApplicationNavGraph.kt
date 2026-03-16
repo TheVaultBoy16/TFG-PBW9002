@@ -29,6 +29,8 @@ fun ApplicationNavGraph(
     onToggleVm: (HomeItem) -> Unit,
     onTakeSnapshot: (HomeItem, String) -> Unit,
     onRestoreSnapshot: (HomeItem, String) -> Unit,
+    onSaveVm: (HomeItem) -> Unit,
+    onRestoreVm: (HomeItem) -> Unit,
     vmList: List<HomeItem>
 ) {
     NavHost(
@@ -43,14 +45,20 @@ fun ApplicationNavGraph(
             LoginScreen(onLoginClick = { u, h, p, po -> onLogin(u, h, p, po) })
         }
         composable(route = Screen.Home.route) {
-            HomeScreen(vmList = vmList, onItemClick = { item -> onSelectItem(item); navController.navigate(Screen.VmDetail.route) }, onToggleVm = onToggleVm)
+            HomeScreen(
+                vmList = vmList, 
+                onItemClick = { item -> onSelectItem(item); navController.navigate(Screen.VmDetail.route) }, 
+                onToggleVm = onToggleVm
+            )
         }
         composable(route = Screen.VmDetail.route) {
             selectedItem?.let { item ->
                 VmScreen(
                     item = item,
                     onTakeSnapshot = { name -> onTakeSnapshot(item, name) },
-                    onRestoreSnapshot = { name -> onRestoreSnapshot(item, name) }
+                    onRestoreSnapshot = { name -> onRestoreSnapshot(item, name) },
+                    onSaveVm = { onSaveVm(item) },
+                    onRestoreVm = { onRestoreVm(item) }
                 )
             }
         }
