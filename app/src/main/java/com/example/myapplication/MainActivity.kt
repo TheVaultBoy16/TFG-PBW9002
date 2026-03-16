@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // CORRECCIÓN: Mantener el polling activo en Home y VmDetail
+                //Mantener el polling activo en Home y VmDetail
                 LaunchedEffect(currentRoute) {
                     if (currentRoute == Screen.Home.route || currentRoute == Screen.VmDetail.route) {
                         homeViewModel.startPolling()
