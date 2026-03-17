@@ -146,7 +146,7 @@ class HomeViewModel(
         val remotePath = "/tmp/${item.name}_$timestamp.ppm"
         val jpgPath = "/tmp/${item.name}_$timestamp.jpg"
         
-        // 1. Tomar captura.
+        //Tomar captura.
         var res = sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand screenshot \"${item.name}\" \"$remotePath\"", session.port)
         if (res.startsWith("ERROR_SSH:")) {
             res = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo -n $virshCommand screenshot \"${item.name}\" \"$remotePath\"", session.port)
@@ -156,10 +156,10 @@ class HomeViewModel(
             return "Error virsh: ${res.removePrefix("ERROR_SSH: ")}. Revisa permisos de sudo."
         }
 
-        // 2. Ajustar permisos
+        //Ajustar permisos
         sshService.executeCommand(session.user, session.host, session.rsaKey, "chmod 666 \"$remotePath\" || sudo -n chmod 666 \"$remotePath\"", session.port)
 
-        // 3. Intentar convertir a JPG (Opcional, si falla bajamos el PPM original)
+        //Intentar convertir a JPG (Opcional, si falla bajamos el PPM original)
         var convRes = sshService.executeCommand(session.user, session.host, session.rsaKey, "convert \"$remotePath\" \"$jpgPath\"", session.port)
         if (convRes.startsWith("ERROR_SSH:")) {
             convRes = sshService.executeCommand(session.user, session.host, session.rsaKey, "ffmpeg -i \"$remotePath\" -y \"$jpgPath\"", session.port)
@@ -167,7 +167,7 @@ class HomeViewModel(
         
         val downloadPath = if (!convRes.startsWith("ERROR_SSH:")) jpgPath else remotePath
         
-        // 4. Descargar
+        //Descargar
         var bytes = sshService.downloadBytes(session.user, session.host, session.rsaKey, downloadPath, session.port)
         if (bytes == null || bytes.isEmpty()) {
             bytes = sshService.downloadBytes(session.user, session.host, session.rsaKey, downloadPath, session.port, useSudo = true)
@@ -175,10 +175,10 @@ class HomeViewModel(
         
         var errorMsg: String? = null
         if (bytes != null && bytes.isNotEmpty()) {
-            // Intentar decodificar normalmente (JPG si hubo conversión)
+            //Intentar decodificar normalmente (JPG si hubo conversión)
             var bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
             
-            // Si falla y es el PPM, usamos nuestro decodificador manual
+            //Si falla y es el PPM, usamos decodificador manual
             if (bitmap == null && downloadPath == remotePath) {
                 bitmap = decodePPM(bytes)
             }
@@ -192,12 +192,13 @@ class HomeViewModel(
             errorMsg = "No se pudo descargar la captura."
         }
 
-        // Limpieza
+        //Limpieza
         sshService.executeCommand(session.user, session.host, session.rsaKey, "rm \"$remotePath\" \"$jpgPath\" || sudo -n rm \"$remotePath\" \"$jpgPath\"", session.port)
         
         return errorMsg
     }
 
+    // Función para decodificar una imagen PPM
     private fun decodePPM(bytes: ByteArray): Bitmap? {
         try {
             var offset = 0
