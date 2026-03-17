@@ -36,6 +36,14 @@ class HomeViewModel(
         refreshSnapshots(item)
     }
 
+    private fun syncSelectedItem() {
+        val current = _selectedItem.value ?: return
+        val updated = _vmList.value.find { it.name == current.name }
+        if (updated != null && (updated.state != current.state || updated.id != current.id)) {
+            _selectedItem.value = updated
+        }
+    }
+
     fun clearData() {
         _vmList.value = emptyList()
         _selectedItem.value = null
@@ -47,7 +55,7 @@ class HomeViewModel(
         if (pollingJob?.isActive == true) return
         pollingJob = viewModelScope.launch {
             while (true) {
-                refreshOnce()
+                refreshOnceSync()
                 delay(10000)
             }
         }
@@ -64,26 +72,30 @@ class HomeViewModel(
         return if (!result.startsWith("ERROR_SSH:")) {
             sessionManager.saveSession(user, host, cleanKey, port)
             _vmList.value = parseVirshOutput(result)
+            syncSelectedItem()
             true
         } else {
             false
         }
     }
 
+    // Versión para llamadas desde UI con callback (recargar una vez)
     fun refreshOnce(onResult: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
-            val session = sessionManager.getSession()
-            if (session != null) {
-                val result = sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand list --all", session.port)
-                if (!result.startsWith("ERROR_SSH:")) {
-                    _vmList.value = parseVirshOutput(result)
-                    onResult(true)
-                } else {
-                    onResult(false)
-                }
-            } else {
-                onResult(false)
-            }
+            onResult(refreshOnceSync())
+        }
+    }
+
+    // Versión interna de suspensión para el polling (mantener recargas periódicas)
+    private suspend fun refreshOnceSync(): Boolean {
+        val session = sessionManager.getSession() ?: return false
+        val result = sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand list --all", session.port)
+        return if (!result.startsWith("ERROR_SSH:")) {
+            _vmList.value = parseVirshOutput(result)
+            syncSelectedItem()
+            true
+        } else {
+            false
         }
     }
 
@@ -111,16 +123,14 @@ class HomeViewModel(
             val targetState = if (isRunning) "shut off" else "running"
 
             _vmList.value = _vmList.value.map { if (it.name == item.name) it.copy(state = "procesando...") else it }
+            syncSelectedItem()
+
             sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand $action \"${item.name}\"", session.port)
             
-            repeat(10) {
-                delay(4000)
-                val r = sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand list --all", session.port)
-                if (!r.startsWith("ERROR_SSH:")) {
-                    val newList = parseVirshOutput(r)
-                    _vmList.value = newList
-                    if (newList.find { it.name == item.name }?.state?.lowercase()?.contains(targetState) == true) return@launch
-                }
+            repeat(15) {
+                delay(3000)
+                refreshOnceSync()
+                if (_vmList.value.find { it.name == item.name }?.state?.lowercase()?.contains(targetState) == true) return@launch
             }
         }
     }
@@ -136,7 +146,9 @@ class HomeViewModel(
 
     suspend fun restoreSnapshot(item: HomeItem, name: String): String {
         val session = sessionManager.getSession() ?: return "Error de sesión"
-        return sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand snapshot-revert \"${item.name}\" \"$name\"", session.port)
+        val res = sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand snapshot-revert \"${item.name}\" \"$name\"", session.port)
+        refreshOnceSync()
+        return res
     }
 
     suspend fun deleteSnapshot(item: HomeItem, name: String): String {
@@ -152,7 +164,7 @@ class HomeViewModel(
         val session = sessionManager.getSession() ?: return "Error de sesión"
         val path = "/var/lib/libvirt/images/${item.name}.save"
         val result = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo $virshCommand save \"${item.name}\" \"$path\"", session.port)
-        refreshOnce()
+        refreshOnceSync()
         return result
     }
 
@@ -160,7 +172,7 @@ class HomeViewModel(
         val session = sessionManager.getSession() ?: return "Error de sesión"
         val path = "/var/lib/libvirt/images/${item.name}.save"
         val result = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo $virshCommand restore \"$path\"", session.port)
-        refreshOnce()
+        refreshOnceSync()
         return result
     }
 

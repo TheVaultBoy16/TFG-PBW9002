@@ -63,7 +63,6 @@ class MainActivity : ComponentActivity() {
                 val selectedItem by homeViewModel.selectedItem.collectAsState()
                 val snapshotList by homeViewModel.snapshotList.collectAsState()
 
-
                 LaunchedEffect(currentRoute) {
                     if (currentRoute == Screen.Default.route) {
                         homeViewModel.refreshOnce { success ->
@@ -76,8 +75,9 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                //Mantener el polling activo en Home y VmDetail
                 LaunchedEffect(currentRoute) {
-                    if (currentRoute == Screen.Home.route) {
+                    if (currentRoute == Screen.Home.route || currentRoute == Screen.VmDetail.route) {
                         homeViewModel.startPolling()
                     } else {
                         homeViewModel.stopPolling()
@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity() {
                             },
                             canNavigateBack = currentRoute == Screen.VmDetail.route || currentRoute == Screen.Login.route,
                             onBackClick = { navController.popBackStack() },
-                            showLogout = currentRoute == Screen.Home.route,
+                            showLogout = currentRoute == Screen.Home.route || currentRoute == Screen.VmDetail.route,
                             onLogoutClick = {
                                 sessionManager.clearSession()
                                 homeViewModel.clearData()
