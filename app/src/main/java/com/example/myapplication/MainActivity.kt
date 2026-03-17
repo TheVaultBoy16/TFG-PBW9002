@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
                 val vmList by homeViewModel.vmList.collectAsState()
                 val selectedItem by homeViewModel.selectedItem.collectAsState()
                 val snapshotList by homeViewModel.snapshotList.collectAsState()
+                val currentScreenshot by homeViewModel.currentScreenshot.collectAsState()
 
                 LaunchedEffect(currentRoute) {
                     if (currentRoute == Screen.Default.route) {
@@ -75,7 +76,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                //Mantener el polling activo en Home y VmDetail
                 LaunchedEffect(currentRoute) {
                     if (currentRoute == Screen.Home.route || currentRoute == Screen.VmDetail.route) {
                         homeViewModel.startPolling()
@@ -113,6 +113,7 @@ class MainActivity : ComponentActivity() {
                         onSelectItem = { homeViewModel.selectItem(it) },
                         vmList = vmList,
                         snapshotList = snapshotList,
+                        screenshot = currentScreenshot,
                         onLogin = { username, hostname, password, port ->
                             scope.launch {
                                 val success = homeViewModel.login(username, hostname, password, port)
@@ -142,6 +143,17 @@ class MainActivity : ComponentActivity() {
                             scope.launch {
                                 val res = homeViewModel.deleteSnapshot(item, name)
                                 Toast.makeText(this@MainActivity, if(res.startsWith("ERROR")) res else "Instantánea borrada", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onTakeScreenshot = { item ->
+                            scope.launch {
+                                Toast.makeText(this@MainActivity, "Iniciando captura de ${item.name}...", Toast.LENGTH_SHORT).show()
+                                val error = homeViewModel.takeScreenshot(item)
+                                if (error != null) {
+                                    Toast.makeText(this@MainActivity, "FALLO: $error", Toast.LENGTH_LONG).show()
+                                } else {
+                                    Toast.makeText(this@MainActivity, "Captura recibida con éxito", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         },
                         onSaveVm = { item ->

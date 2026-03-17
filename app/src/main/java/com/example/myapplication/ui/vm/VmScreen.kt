@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.vm
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -44,9 +46,11 @@ import com.example.myapplication.data.HomeItem
 fun VmScreen(
     item: HomeItem,
     snapshotList: List<String>,
+    screenshot: Bitmap?,
     onTakeSnapshot: (String) -> Unit,
     onRestoreSnapshot: (String) -> Unit,
     onDeleteSnapshot: (String) -> Unit,
+    onTakeScreenshot: () -> Unit,
     onSaveVm: () -> Unit,
     onRestoreVm: () -> Unit,
     modifier: Modifier = Modifier
@@ -91,6 +95,33 @@ fun VmScreen(
                 Text(text = item.name, style = MaterialTheme.typography.headlineSmall)
                 Text(text = displayState, style = MaterialTheme.typography.bodyMedium, color = stateColor)
             }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Sección de tomar captura de pantalla
+        Text(text = "Captura de Pantalla", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        if (screenshot != null) {
+            Image(
+                bitmap = screenshot.asImageBitmap(),
+                contentDescription = "VM Screenshot",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Fit
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        
+        Button(
+            onClick = onTakeScreenshot,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = isRunning
+        ) {
+            Text("Tomar Captura")
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -201,9 +232,11 @@ fun VmScreenPreview() {
     VmScreen(
         item = HomeItem("1", "MV de Prueba", "running", R.drawable.apagada),
         snapshotList = listOf("Snap1", "Snap2"),
+        screenshot = null,
         onTakeSnapshot = {},
         onRestoreSnapshot = {},
         onDeleteSnapshot = {},
+        onTakeScreenshot = {},
         onSaveVm = {},
         onRestoreVm = {}
     )

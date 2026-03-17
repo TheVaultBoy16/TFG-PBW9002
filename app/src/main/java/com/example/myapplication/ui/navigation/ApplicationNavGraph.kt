@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.navigation
 
+import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -30,10 +31,12 @@ fun ApplicationNavGraph(
     onTakeSnapshot: (HomeItem, String) -> Unit,
     onRestoreSnapshot: (HomeItem, String) -> Unit,
     onDeleteSnapshot: (HomeItem, String) -> Unit,
+    onTakeScreenshot: (HomeItem) -> Unit,
     onSaveVm: (HomeItem) -> Unit,
     onRestoreVm: (HomeItem) -> Unit,
     vmList: List<HomeItem>,
-    snapshotList: List<String>
+    snapshotList: List<String>,
+    screenshot: Bitmap?
 ) {
     NavHost(
         navController = navController,
@@ -58,9 +61,11 @@ fun ApplicationNavGraph(
                 VmScreen(
                     item = item,
                     snapshotList = snapshotList,
+                    screenshot = screenshot,
                     onTakeSnapshot = { name -> onTakeSnapshot(item, name) },
                     onRestoreSnapshot = { name -> onRestoreSnapshot(item, name) },
                     onDeleteSnapshot = { name -> onDeleteSnapshot(item, name) },
+                    onTakeScreenshot = { onTakeScreenshot(item) },
                     onSaveVm = { onSaveVm(item) },
                     onRestoreVm = { onRestoreVm(item) }
                 )
