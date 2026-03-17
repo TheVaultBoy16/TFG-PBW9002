@@ -79,14 +79,14 @@ class HomeViewModel(
         }
     }
 
-    // Versión para llamadas desde UI con callback
+    // Versión para llamadas desde UI con callback (recargar una vez)
     fun refreshOnce(onResult: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             onResult(refreshOnceSync())
         }
     }
 
-    // Versión interna de suspensión para el polling
+    // Versión interna de suspensión para el polling (mantener recargas periódicas)
     private suspend fun refreshOnceSync(): Boolean {
         val session = sessionManager.getSession() ?: return false
         val result = sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand list --all", session.port)
