@@ -2,7 +2,12 @@ package com.example.myapplication.ui.vm
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,12 +20,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -32,12 +41,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.myapplication.R
 import com.example.myapplication.data.HomeItem
 
@@ -58,6 +71,7 @@ fun VmScreen(
     var newSnapshotName by remember { mutableStateOf("") }
     var selectedSnapshot by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
+    var showFullScreen by remember { mutableStateOf(false) }
 
     val isRunning = item.state.lowercase().contains("running")
     val displayState = if (isRunning) "Ejecutándose" else "Apagada"
@@ -65,6 +79,10 @@ fun VmScreen(
     val imageRes = if (isRunning) R.drawable.ejecutandose else R.drawable.apagada
     
     val scrollState = rememberScrollState()
+
+    if (showFullScreen && screenshot != null) {
+        FullScreenImageDialog(bitmap = screenshot, onDismiss = { showFullScreen = false })
+    }
 
     Column(
         modifier = modifier
@@ -110,7 +128,8 @@ fun VmScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp)
-                    .clip(RoundedCornerShape(8.dp)),
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { showFullScreen = true },
                 contentScale = ContentScale.Fit
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -221,6 +240,55 @@ fun VmScreen(
             }
             Button(onClick = onRestoreVm, modifier = Modifier.weight(1f), enabled = !isRunning) {
                 Text("Cargar")
+            }
+        }
+    }
+}
+
+@Composable
+fun FullScreenImageDialog(bitmap: Bitmap, onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            var scale by remember { mutableStateOf(1f) }
+            var offset by remember { mutableStateOf(Offset.Zero) }
+            val state = rememberTransformableState { zoomChange, offsetChange, _ ->
+                scale *= zoomChange
+                offset += offsetChange
+            }
+
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = maxOf(1f, scale),
+                        scaleY = maxOf(1f, scale),
+                        translationX = offset.x,
+                        translationY = offset.y
+                    )
+                    .transformable(state = state),
+                contentScale = ContentScale.Fit
+            )
+
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Cerrar",
+                    tint = Color.White
+                )
             }
         }
     }
