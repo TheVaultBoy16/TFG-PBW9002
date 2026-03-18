@@ -1,6 +1,11 @@
 package com.example.myapplication
 
+import android.content.ContentValues
+import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -62,6 +67,7 @@ class MainActivity : ComponentActivity() {
                 val vmList by homeViewModel.vmList.collectAsState()
                 val selectedItem by homeViewModel.selectedItem.collectAsState()
                 val snapshotList by homeViewModel.snapshotList.collectAsState()
+                val currentScreenshot by homeViewModel.currentScreenshot.collectAsState()
 
                 LaunchedEffect(currentRoute) {
                     if (currentRoute == Screen.Default.route) {
@@ -75,7 +81,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                //Mantener el polling activo en Home y VmDetail
                 LaunchedEffect(currentRoute) {
                     if (currentRoute == Screen.Home.route || currentRoute == Screen.VmDetail.route) {
                         homeViewModel.startPolling()
@@ -113,6 +118,7 @@ class MainActivity : ComponentActivity() {
                         onSelectItem = { homeViewModel.selectItem(it) },
                         vmList = vmList,
                         snapshotList = snapshotList,
+                        screenshot = currentScreenshot,
                         onLogin = { username, hostname, password, port ->
                             scope.launch {
                                 val success = homeViewModel.login(username, hostname, password, port)
@@ -144,6 +150,20 @@ class MainActivity : ComponentActivity() {
                                 Toast.makeText(this@MainActivity, if(res.startsWith("ERROR")) res else "Instantánea borrada", Toast.LENGTH_SHORT).show()
                             }
                         },
+                        onTakeScreenshot = { item ->
+                            scope.launch {
+                                Toast.makeText(this@MainActivity, "Iniciando captura de ${item.name}...", Toast.LENGTH_SHORT).show()
+                                val error = homeViewModel.takeScreenshot(item)
+                                if (error != null) {
+                                    Toast.makeText(this@MainActivity, "FALLO: $error", Toast.LENGTH_LONG).show()
+                                } else {
+                                    homeViewModel.currentScreenshot.value?.let { bitmap ->
+                                        saveBitmapToGallery(bitmap, "${item.name}_${System.currentTimeMillis()}.jpg")
+                                    }
+                                    Toast.makeText(this@MainActivity, "Captura recibida y guardada", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
                         onSaveVm = { item ->
                             scope.launch {
                                 val res = homeViewModel.saveVm(item)
@@ -160,6 +180,38 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+    }
+
+    private fun saveBitmapToGallery(bitmap: Bitmap, displayName: String) {
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/MyApplication")
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+        }
+
+        val resolver = contentResolver
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+
+        uri?.let {
+            try {
+                resolver.openOutputStream(it)?.use { outputStream ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    contentValues.clear()
+                    contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                    resolver.update(it, contentValues, null, null)
+                }
+            } catch (e: Exception) {
+                resolver.delete(it, null, null)
+                Toast.makeText(this, "Error al guardar imagen: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        } ?: run {
+            Toast.makeText(this, "Error al crear entrada en la galería", Toast.LENGTH_SHORT).show()
         }
     }
 }
