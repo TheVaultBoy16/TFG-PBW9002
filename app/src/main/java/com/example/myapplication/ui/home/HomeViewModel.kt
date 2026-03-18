@@ -120,6 +120,17 @@ class HomeViewModel(
         }
     }
 
+    private suspend fun executeVirshAction(item: HomeItem, actionCommand: String): String {
+        val session = sessionManager.getSession() ?: return "Error de sesión"
+        // Intentar primero sin sudo
+        var res = sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand $actionCommand", session.port)
+        // Si falla por permisos, intentar con sudo -n
+        if (res.startsWith("ERROR_SSH:") && (res.contains("permission denied", ignoreCase = true) || res.contains("authentication failed", ignoreCase = true))) {
+            res = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo -n $virshCommand $actionCommand", session.port)
+        }
+        return res
+    }
+
     fun toggleVm(item: HomeItem) {
         viewModelScope.launch {
             val session = sessionManager.getSession() ?: return@launch
@@ -130,7 +141,7 @@ class HomeViewModel(
             _vmList.value = _vmList.value.map { if (it.name == item.name) it.copy(state = "procesando...") else it }
             syncSelectedItem()
 
-            sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo -n $virshCommand $action \"${item.name}\"", session.port)
+            executeVirshAction(item, "$action \"${item.name}\"")
             
             repeat(15) {
                 delay(3000)
@@ -146,39 +157,22 @@ class HomeViewModel(
         val remotePath = "/tmp/${item.name}_$timestamp.ppm"
         val jpgPath = "/tmp/${item.name}_$timestamp.jpg"
         
-        //Tomar captura.
-        var res = sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand screenshot \"${item.name}\" \"$remotePath\"", session.port)
-        if (res.startsWith("ERROR_SSH:")) {
-            res = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo -n $virshCommand screenshot \"${item.name}\" \"$remotePath\"", session.port)
-        }
+        // 1. Tomar captura (intenta sin sudo, luego con sudo)
+        var res = executeVirshAction(item, "screenshot \"${item.name}\" \"$remotePath\"")
+        if (res.startsWith("ERROR_SSH:")) return "Error al capturar (virsh): $res"
 
-        if (res.startsWith("ERROR_SSH:")) {
-            return "Error virsh: ${res.removePrefix("ERROR_SSH: ")}. Revisa permisos de sudo."
-        }
-
-        //Ajustar permisos
+        // 2. Dar permisos (intentamos normal, luego sudo)
         sshService.executeCommand(session.user, session.host, session.rsaKey, "chmod 666 \"$remotePath\" || sudo -n chmod 666 \"$remotePath\"", session.port)
 
-        //Intentar convertir a JPG (Opcional, si falla bajamos el PPM original)
-        var convRes = sshService.executeCommand(session.user, session.host, session.rsaKey, "convert \"$remotePath\" \"$jpgPath\"", session.port)
-        if (convRes.startsWith("ERROR_SSH:")) {
-            convRes = sshService.executeCommand(session.user, session.host, session.rsaKey, "ffmpeg -i \"$remotePath\" -y \"$jpgPath\"", session.port)
-        }
+        // 3. Intentar convertir a JPG
+        val convRes = sshService.executeCommand(session.user, session.host, session.rsaKey, "convert \"$remotePath\" \"$jpgPath\"", session.port)
         
         val downloadPath = if (!convRes.startsWith("ERROR_SSH:")) jpgPath else remotePath
-        
-        //Descargar
-        var bytes = sshService.downloadBytes(session.user, session.host, session.rsaKey, downloadPath, session.port)
-        if (bytes == null || bytes.isEmpty()) {
-            bytes = sshService.downloadBytes(session.user, session.host, session.rsaKey, downloadPath, session.port, useSudo = true)
-        }
+        val bytes = sshService.downloadBytes(session.user, session.host, session.rsaKey, downloadPath, session.port)
         
         var errorMsg: String? = null
         if (bytes != null && bytes.isNotEmpty()) {
-            //Intentar decodificar normalmente (JPG si hubo conversión)
             var bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            
-            //Si falla y es el PPM, usamos decodificador manual
             if (bitmap == null && downloadPath == remotePath) {
                 bitmap = decodePPM(bytes)
             }
@@ -186,29 +180,26 @@ class HomeViewModel(
             if (bitmap != null) {
                 _currentScreenshot.value = bitmap
             } else {
-                errorMsg = "Error al procesar la imagen capturada."
+                errorMsg = "Captura descargada pero formato no soportado."
             }
         } else {
-            errorMsg = "No se pudo descargar la captura."
+            errorMsg = "Error al descargar el archivo de imagen."
         }
 
-        //Limpieza
+        // Limpieza
         sshService.executeCommand(session.user, session.host, session.rsaKey, "rm \"$remotePath\" \"$jpgPath\" || sudo -n rm \"$remotePath\" \"$jpgPath\"", session.port)
         
         return errorMsg
     }
 
-    // Función para decodificar una imagen PPM
     private fun decodePPM(bytes: ByteArray): Bitmap? {
         try {
             var offset = 0
             fun readNext(): String {
                 val sb = StringBuilder()
-                // Skip whitespace
                 while (offset < bytes.size && bytes[offset].toInt().toChar().isWhitespace()) offset++
-                // Read field
                 while (offset < bytes.size && !bytes[offset].toInt().toChar().isWhitespace()) {
-                    if (bytes[offset].toInt().toChar() == '#') { // Skip comments
+                    if (bytes[offset].toInt().toChar() == '#') {
                         while (offset < bytes.size && bytes[offset].toInt().toChar() != '\n') offset++
                         while (offset < bytes.size && bytes[offset].toInt().toChar().isWhitespace()) offset++
                     } else {
@@ -223,8 +214,6 @@ class HomeViewModel(
             val width = readNext().toInt()
             val height = readNext().toInt()
             val maxVal = readNext().toInt()
-            
-            // Skip the single whitespace character after MaxVal
             if (offset < bytes.size && bytes[offset].toInt().toChar().isWhitespace()) offset++
 
             val pixels = IntArray(width * height)
@@ -235,7 +224,6 @@ class HomeViewModel(
                 val b = bytes[offset++].toInt() and 0xFF
                 pixels[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
             }
-
             return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
         } catch (e: Exception) {
             return null
@@ -243,44 +231,42 @@ class HomeViewModel(
     }
 
     suspend fun takeSnapshot(item: HomeItem, name: String): String {
-        val session = sessionManager.getSession() ?: return "Error de sesión"
-        val result = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo -n $virshCommand snapshot-create-as \"${item.name}\" \"$name\"", session.port)
-        if (!result.startsWith("ERROR_SSH:")) {
+        val res = executeVirshAction(item, "snapshot-create-as \"${item.name}\" \"$name\"")
+        if (!res.startsWith("ERROR_SSH:")) {
             refreshSnapshots(item)
         }
-        return result
+        return res
     }
 
     suspend fun restoreSnapshot(item: HomeItem, name: String): String {
-        val session = sessionManager.getSession() ?: return "Error de sesión"
-        val res = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo -n $virshCommand snapshot-revert \"${item.name}\" \"$name\"", session.port)
-        refreshOnceSync()
+        val res = executeVirshAction(item, "snapshot-revert \"${item.name}\" \"$name\"")
+        if (!res.startsWith("ERROR_SSH:")) {
+            refreshOnceSync()
+        }
         return res
     }
 
     suspend fun deleteSnapshot(item: HomeItem, name: String): String {
-        val session = sessionManager.getSession() ?: return "Error de sesión"
-        val result = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo -n $virshCommand snapshot-delete \"${item.name}\" \"$name\"", session.port)
-        if (!result.startsWith("ERROR_SSH:")) {
+        val res = executeVirshAction(item, "snapshot-delete \"${item.name}\" \"$name\"")
+        if (!res.startsWith("ERROR_SSH:")) {
             refreshSnapshots(item)
         }
-        return result
+        return res
     }
 
     suspend fun saveVm(item: HomeItem): String {
-        val session = sessionManager.getSession() ?: return "Error de sesión"
         val path = "/var/lib/libvirt/images/${item.name}.save"
-        val result = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo -n $virshCommand save \"${item.name}\" \"$path\"", session.port)
+        // Para save/restore solemos necesitar sudo casi siempre por la ruta del archivo
+        val res = executeVirshAction(item, "save \"${item.name}\" \"$path\"")
         refreshOnceSync()
-        return result
+        return res
     }
 
     suspend fun restoreVm(item: HomeItem): String {
-        val session = sessionManager.getSession() ?: return "Error de sesión"
         val path = "/var/lib/libvirt/images/${item.name}.save"
-        val result = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo -n $virshCommand restore \"$path\"", session.port)
+        val res = executeVirshAction(item, "restore \"$path\"")
         refreshOnceSync()
-        return result
+        return res
     }
 
     private fun parseVirshOutput(output: String): List<HomeItem> {
