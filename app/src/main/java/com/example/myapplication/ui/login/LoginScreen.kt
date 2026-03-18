@@ -82,38 +82,38 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = it },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            OutlinedTextField(
-                value = selectedHypervisor,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Hipervisor") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                    .fillMaxWidth()
-            )
-
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                hypervisors.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option) },
-                        onClick = {
-                            selectedHypervisor = option
-                            expanded = false
-                        },
-                        contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
-                    )
-                }
-            }
-        }
+//        ExposedDropdownMenuBox(
+//            expanded = expanded,
+//            onExpandedChange = { expanded = it },
+//            modifier = Modifier.fillMaxWidth()
+//        ) {
+//            OutlinedTextField(
+//                value = selectedHypervisor,
+//                onValueChange = {},
+//                readOnly = true,
+//                label = { Text("Hipervisor") },
+//                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+//                modifier = Modifier
+//                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+//                    .fillMaxWidth()
+//            )
+//
+//            ExposedDropdownMenu(
+//                expanded = expanded,
+//                onDismissRequest = { expanded = false }
+//            ) {
+//                hypervisors.forEach { option ->
+//                    DropdownMenuItem(
+//                        text = { Text(option) },
+//                        onClick = {
+//                            selectedHypervisor = option
+//                            expanded = false
+//                        },
+//                        contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+//                    )
+//                }
+//            }
+//        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
