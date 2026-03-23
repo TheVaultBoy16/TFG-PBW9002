@@ -255,16 +255,15 @@ class HomeViewModel(
     }
 
     suspend fun saveVm(item: HomeItem): String {
-        val path = "/var/lib/libvirt/images/${item.name}.save"
-        // Para save/restore solemos necesitar sudo casi siempre por la ruta del archivo
-        val res = executeVirshAction(item, "save \"${item.name}\" \"$path\"")
+        // Cambiado de 'save' a 'managedsave'
+        val res = executeVirshAction(item, "managedsave \"${item.name}\"")
         refreshOnceSync()
         return res
     }
 
     suspend fun restoreVm(item: HomeItem): String {
-        val path = "/var/lib/libvirt/images/${item.name}.save"
-        val res = executeVirshAction(item, "restore \"$path\"")
+        // 'managedsave' se restaura automáticamente con 'start'
+        val res = executeVirshAction(item, "start \"${item.name}\"")
         refreshOnceSync()
         return res
     }
