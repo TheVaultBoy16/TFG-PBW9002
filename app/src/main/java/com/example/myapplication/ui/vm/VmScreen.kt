@@ -78,7 +78,7 @@ fun VmScreen(
     val isSaved = stateLower.contains("saved") || stateLower.contains("guardada")
     
     val (displayState, stateColor) = when {
-        isRunning -> "Ejecución" to Color(0xFF4CAF50)
+        isRunning -> "Ejecutándose" to Color(0xFF4CAF50)
         isSaved -> "Guardada" to Color(0xFF2196F3)
         else -> "Apagada" to Color.Gray
     }
