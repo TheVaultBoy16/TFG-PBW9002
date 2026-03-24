@@ -95,9 +95,9 @@ fun HomeItemCard(
     val isSaved = stateLower.contains("guardada")
     
     val stateColor = when {
-        isRunning -> Color(0xFF4CAF50) // Verde
-        isSaved -> Color(0xFF2196F3)   // Azul para Guardada
-        else -> Color.Gray             // Gris para Apagada
+        isRunning -> Color(0xFF4CAF50)
+        isSaved -> Color(0xFF2196F3)
+        else -> Color.Gray
     }
     
     val imageRes = if (isRunning) R.drawable.ejecutandose else R.drawable.apagada
