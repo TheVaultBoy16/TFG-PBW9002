@@ -69,7 +69,8 @@ fun HomeScreen(
                 HomeItemCard(
                     item = item,
                     onToggleClick = {
-                        val isRunning = item.state.lowercase().contains("ejecut") || item.state.lowercase().contains("running")
+                        val stateLower = item.state.lowercase()
+                        val isRunning = stateLower.contains("running") || stateLower.contains("ejecut")
                         if (!isRunning) {
                             scope.launch {
                                 listState.animateScrollToItem(0)
@@ -91,13 +92,13 @@ fun HomeItemCard(
     modifier: Modifier = Modifier
 ) {
     val stateLower = item.state.lowercase()
-    val isRunning = stateLower.contains("ejecut") || stateLower.contains("running")
-    val isSaved = stateLower.contains("guardada")
+    val isRunning = stateLower.contains("running") || stateLower.contains("ejecut")
+    val isSaved = stateLower.contains("saved") || stateLower.contains("guardada")
     
-    val stateColor = when {
-        isRunning -> Color(0xFF4CAF50)
-        isSaved -> Color(0xFF2196F3)
-        else -> Color.Gray
+    val (displayState, stateColor) = when {
+        isRunning -> "Ejecutándose" to Color(0xFF4CAF50)
+        isSaved -> "Guardada" to Color(0xFF2196F3)
+        else -> "Apagada" to Color.Gray
     }
     
     val imageRes = if (isRunning) R.drawable.ejecutandose else R.drawable.apagada
@@ -131,7 +132,7 @@ fun HomeItemCard(
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
-                    text = item.state, // Usamos el estado directamente del ViewModel
+                    text = displayState,
                     style = MaterialTheme.typography.bodySmall,
                     color = stateColor
                 )

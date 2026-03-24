@@ -73,14 +73,16 @@ fun VmScreen(
     var expanded by remember { mutableStateOf(false) }
     var showFullScreen by remember { mutableStateOf(false) }
 
-    val isRunning = item.state.lowercase().contains("running")
-    //val displayState = if (isRunning) "Ejecutándose" else "Apagada"
-    val isSaved = item.state.lowercase().contains("guardada")
-    val stateColor = when {
-        isRunning -> Color(0xFF4CAF50)
-        isSaved -> Color(0xFF2196F3)
-        else -> Color.Gray
+    val stateLower = item.state.lowercase()
+    val isRunning = stateLower.contains("running") || stateLower.contains("ejecut")
+    val isSaved = stateLower.contains("saved") || stateLower.contains("guardada")
+    
+    val (displayState, stateColor) = when {
+        isRunning -> "Ejecución" to Color(0xFF4CAF50)
+        isSaved -> "Guardada" to Color(0xFF2196F3)
+        else -> "Apagada" to Color.Gray
     }
+    
     val imageRes = if (isRunning) R.drawable.ejecutandose else R.drawable.apagada
     
     val scrollState = rememberScrollState()
@@ -116,7 +118,7 @@ fun VmScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(text = item.name, style = MaterialTheme.typography.headlineSmall)
-                Text(text = item.state, style = MaterialTheme.typography.bodyMedium, color = stateColor)
+                Text(text = displayState, style = MaterialTheme.typography.bodyMedium, color = stateColor)
             }
         }
 
