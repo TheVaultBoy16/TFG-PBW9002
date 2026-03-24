@@ -73,10 +73,9 @@ fun VmScreen(
     var expanded by remember { mutableStateOf(false) }
     var showFullScreen by remember { mutableStateOf(false) }
 
-    val stateLower = item.state.lowercase()
     val isRunning = item.state.lowercase().contains("running")
     //val displayState = if (isRunning) "Ejecutándose" else "Apagada"
-    val isSaved = stateLower.contains("guardada")
+    val isSaved = item.state.lowercase().contains("guardada")
     val stateColor = when {
         isRunning -> Color(0xFF4CAF50)
         isSaved -> Color(0xFF2196F3)
