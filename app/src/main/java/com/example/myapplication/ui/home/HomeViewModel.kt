@@ -36,6 +36,8 @@ class HomeViewModel(
     private var pollingJob: Job? = null
     private val virshCommand = "virsh --connect qemu:///system"
 
+    private val detailedListCommand = "for vm in \$($virshCommand list --all --name); do if [ -n \"\$vm\" ]; then echo \"---VM:\$vm---\"; $virshCommand dominfo \"\$vm\" | grep -E \"Id:|State:|Managed save:\"; fi; done"
+
     fun selectItem(item: HomeItem) {
         _selectedItem.value = item
         _currentScreenshot.value = null
@@ -74,11 +76,11 @@ class HomeViewModel(
 
     suspend fun login(user: String, host: String, key: String, port: Int): Boolean {
         val cleanKey = key.trim()
-        val result = sshService.executeCommand(user, host, cleanKey, "$virshCommand list --all", port)
+        val result = sshService.executeCommand(user, host, cleanKey, detailedListCommand, port)
         
         return if (!result.startsWith("ERROR_SSH:")) {
             sessionManager.saveSession(user, host, cleanKey, port)
-            _vmList.value = parseVirshOutput(result)
+            _vmList.value = parseDetailedOutput(result)
             syncSelectedItem()
             true
         } else {
@@ -94,9 +96,9 @@ class HomeViewModel(
 
     private suspend fun refreshOnceSync(): Boolean {
         val session = sessionManager.getSession() ?: return false
-        val result = sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand list --all", session.port)
+        val result = sshService.executeCommand(session.user, session.host, session.rsaKey, detailedListCommand, session.port)
         return if (!result.startsWith("ERROR_SSH:")) {
-            _vmList.value = parseVirshOutput(result)
+            _vmList.value = parseDetailedOutput(result)
             syncSelectedItem()
             true
         } else {
@@ -122,9 +124,7 @@ class HomeViewModel(
 
     private suspend fun executeVirshAction(item: HomeItem, actionCommand: String): String {
         val session = sessionManager.getSession() ?: return "Error de sesión"
-        // Intentar primero sin sudo
         var res = sshService.executeCommand(session.user, session.host, session.rsaKey, "$virshCommand $actionCommand", session.port)
-        // Si falla por permisos, intentar con sudo -n
         if (res.startsWith("ERROR_SSH:") && (res.contains("permission denied", ignoreCase = true) || res.contains("authentication failed", ignoreCase = true))) {
             res = sshService.executeCommand(session.user, session.host, session.rsaKey, "sudo -n $virshCommand $actionCommand", session.port)
         }
@@ -146,7 +146,8 @@ class HomeViewModel(
             repeat(15) {
                 delay(3000)
                 refreshOnceSync()
-                if (_vmList.value.find { it.name == item.name }?.state?.lowercase()?.contains(targetState) == true) return@launch
+                val current = _vmList.value.find { it.name == item.name }
+                if (current?.state?.lowercase()?.contains(targetState) == true) return@launch
             }
         }
     }
@@ -157,38 +158,30 @@ class HomeViewModel(
         val remotePath = "/tmp/${item.name}_$timestamp.ppm"
         val jpgPath = "/tmp/${item.name}_$timestamp.jpg"
         
-        // 1. Tomar captura (intenta sin sudo, luego con sudo)
         var res = executeVirshAction(item, "screenshot \"${item.name}\" \"$remotePath\"")
         if (res.startsWith("ERROR_SSH:")) return "Error al capturar (virsh): $res"
 
-        // 2. Dar permisos (intentamos normal, luego sudo)
         sshService.executeCommand(session.user, session.host, session.rsaKey, "chmod 666 \"$remotePath\" || sudo -n chmod 666 \"$remotePath\"", session.port)
 
-        // 3. Intentar convertir a JPG
         val convRes = sshService.executeCommand(session.user, session.host, session.rsaKey, "convert \"$remotePath\" \"$jpgPath\"", session.port)
-        
         val downloadPath = if (!convRes.startsWith("ERROR_SSH:")) jpgPath else remotePath
         val bytes = sshService.downloadBytes(session.user, session.host, session.rsaKey, downloadPath, session.port)
         
         var errorMsg: String? = null
         if (bytes != null && bytes.isNotEmpty()) {
             var bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            if (bitmap == null && downloadPath == remotePath) {
-                bitmap = decodePPM(bytes)
-            }
+            if (bitmap == null && downloadPath == remotePath) bitmap = decodePPM(bytes)
 
             if (bitmap != null) {
                 _currentScreenshot.value = bitmap
             } else {
-                errorMsg = "Captura descargada pero formato no soportado."
+                errorMsg = "Error al procesar la imagen."
             }
         } else {
-            errorMsg = "Error al descargar el archivo de imagen."
+            errorMsg = "No se pudo descargar la captura."
         }
 
-        // Limpieza
         sshService.executeCommand(session.user, session.host, session.rsaKey, "rm \"$remotePath\" \"$jpgPath\" || sudo -n rm \"$remotePath\" \"$jpgPath\"", session.port)
-        
         return errorMsg
     }
 
@@ -209,13 +202,11 @@ class HomeViewModel(
                 }
                 return sb.toString()
             }
-
             if (readNext() != "P6") return null
             val width = readNext().toInt()
             val height = readNext().toInt()
             val maxVal = readNext().toInt()
             if (offset < bytes.size && bytes[offset].toInt().toChar().isWhitespace()) offset++
-
             val pixels = IntArray(width * height)
             for (i in 0 until width * height) {
                 if (offset + 2 >= bytes.size) break
@@ -225,61 +216,65 @@ class HomeViewModel(
                 pixels[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
             }
             return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
-        } catch (e: Exception) {
-            return null
-        }
+        } catch (e: Exception) { return null }
     }
 
     suspend fun takeSnapshot(item: HomeItem, name: String): String {
         val res = executeVirshAction(item, "snapshot-create-as \"${item.name}\" \"$name\"")
-        if (!res.startsWith("ERROR_SSH:")) {
-            refreshSnapshots(item)
-        }
+        if (!res.startsWith("ERROR_SSH:")) refreshSnapshots(item)
         return res
     }
 
     suspend fun restoreSnapshot(item: HomeItem, name: String): String {
         val res = executeVirshAction(item, "snapshot-revert \"${item.name}\" \"$name\"")
-        if (!res.startsWith("ERROR_SSH:")) {
-            refreshOnceSync()
-        }
+        if (!res.startsWith("ERROR_SSH:")) refreshOnceSync()
         return res
     }
 
     suspend fun deleteSnapshot(item: HomeItem, name: String): String {
         val res = executeVirshAction(item, "snapshot-delete \"${item.name}\" \"$name\"")
-        if (!res.startsWith("ERROR_SSH:")) {
-            refreshSnapshots(item)
-        }
+        if (!res.startsWith("ERROR_SSH:")) refreshSnapshots(item)
         return res
     }
 
     suspend fun saveVm(item: HomeItem): String {
-        // Cambiado de 'save' a 'managedsave'
         val res = executeVirshAction(item, "managedsave \"${item.name}\"")
         refreshOnceSync()
         return res
     }
 
     suspend fun restoreVm(item: HomeItem): String {
-        // 'managedsave' se restaura automáticamente con 'start'
         val res = executeVirshAction(item, "start \"${item.name}\"")
         refreshOnceSync()
         return res
     }
 
-    private fun parseVirshOutput(output: String): List<HomeItem> {
-        val lines = output.lines()
+    private fun parseDetailedOutput(output: String): List<HomeItem> {
         val vms = mutableListOf<HomeItem>()
-        for (line in lines) {
-            val t = line.trim()
-            if (t.isEmpty() || t.lowercase().startsWith("id") || t.startsWith("---")) continue
-            val parts = t.split(Regex("\\s+")).filter { it.isNotBlank() }
-            if (parts.size >= 3) {
-                val state = parts.subList(2, parts.size).joinToString(" ")
-                val isRunning = state.lowercase().contains("running")
+        val blocks = output.split("---VM:").filter { it.isNotBlank() }
+        
+        for (block in blocks) {
+            val lines = block.lines()
+            if (lines.isEmpty()) continue
+            val name = lines[0].substringBefore("---").trim()
+            var id = "-"
+            var state = "shut off"
+            var hasManagedSave = false
+            
+            for (line in lines) {
+                val trimmed = line.trim().lowercase()
+                when {
+                    trimmed.startsWith("id:") -> id = line.substringAfter(":").trim()
+                    trimmed.startsWith("state:") -> state = line.substringAfter(":").trim().lowercase()
+                    trimmed.startsWith("managed save:") -> hasManagedSave = line.substringAfter(":").trim().lowercase() == "yes"
+                }
+            }
+            
+            if (name.isNotEmpty()) {
+                val isRunning = state.contains("running")
+                val finalState = if (hasManagedSave && state.contains("shut off")) "saved" else state
                 val img = if (isRunning) R.drawable.ejecutandose else R.drawable.apagada
-                vms.add(HomeItem(id = parts[0], name = parts[1], state = state, imageRes = img))
+                vms.add(HomeItem(id = id, name = name, state = finalState, imageRes = img))
             }
         }
         return vms
