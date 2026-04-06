@@ -170,7 +170,7 @@ fun LoginScreen(
             modifier = Modifier.fillMaxWidth(),
             enabled = privateKey.isNotEmpty() && username.isNotEmpty() && hostname.isNotEmpty()
         ) {
-            Text(text = "Conectar mediante RSA")
+            Text(text = "Iniciar sesión")
         }
     }
 }
