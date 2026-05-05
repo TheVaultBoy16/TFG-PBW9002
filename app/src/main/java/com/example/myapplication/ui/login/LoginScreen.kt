@@ -72,7 +72,7 @@ fun LoginScreen(
     }
 
     var expanded by remember { mutableStateOf(false) }
-    val hypervisors = listOf("QEMU", "Libvirt")
+    val hypervisors = listOf("QEMU")
     var selectedHypervisor by remember { mutableStateOf(hypervisors[0]) }
 
     Column(
